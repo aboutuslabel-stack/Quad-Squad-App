@@ -172,6 +172,7 @@ function melbTime(iso){ try{return new Date(iso).toLocaleTimeString('en-AU',{hou
 // ---------- scoring ----------
 // Personal boards (Players, Couples, Mug) = your 5 bets + Pick of the Day. Group picks only count for Guys v Girls.
 const PERSONAL=b=>b.bet_type!=='group_pick';
+const STAKE={individual:10, pick_of_day:15, group_pick:10};   // 16 × (5×$10 + $15 + $10) = $1,200 + team games $800 = $2,000
 function playerPoints(pid){
   return (S.data.bets||[]).filter(b=>b.player_id===pid&&PERSONAL(b)).reduce((a,b)=>a+Number(b.points||0),0);
 }
@@ -438,11 +439,11 @@ function renderBets(){
   const team=me&&me.gender==='M'?'👔 Guys':'👗 Girls';
   const v=el(`<div class="wrap"><h2 style="margin-top:14px">🎰 My Bets</h2>
     ${closeBar()}
-    <p class="hint">Your group pick for the ${team} ($25) · your own Pick of the Day ($25, double points) · 5 bets @ $10.</p>
-    <div class="card"><div class="spread"><b>👥 Group pick · $25 · for the ${team}</b><span class="pill ${me&&me.gender==='M'?'blue':'rose'}">TEAM</span></div>
+    <p class="hint">Your group pick for the ${team} ($${STAKE.group_pick}) · your own Pick of the Day ($${STAKE.pick_of_day}, double points) · 5 bets @ $${STAKE.individual}.</p>
+    <div class="card"><div class="spread"><b>👥 Group pick · $${STAKE.group_pick} · for the ${team}</b><span class="pill ${me&&me.gender==='M'?'blue':'rose'}">TEAM</span></div>
       <div class="hint">Your drawn race: pick one horse for your team. It's 👔 v 👗 in every race, and it counts on the Guys v Girls board.</div>
       <div id="grpbox"></div></div>
-    <div class="card"><div class="spread"><b>🎯 Pick of the Day · $25 · ×2 pts</b><span class="pill g">DOUBLE</span></div>
+    <div class="card"><div class="spread"><b>🎯 Pick of the Day · $${STAKE.pick_of_day} · ×2 pts</b><span class="pill g">DOUBLE</span></div>
       <div class="hint">Your best bet of the day: any race, any horse. A bit more on it, and double points on your own board.</div>
       <div id="podbox"></div></div>
     <div class="spread" style="margin:10px 2px"><b>Your 5 bets</b><span class="mut small">${myInd.length}/5 placed</span></div>
@@ -453,7 +454,7 @@ function renderBets(){
   // group pick
   const grpbox=v.querySelector('#grpbox');
   if(!grp) grpbox.appendChild(el(`<div class="hint">Not drawn yet. The admin runs the draw before 2:30.</div>`));
-  else grpbox.appendChild(betEditor(grp,'group_pick',25));
+  else grpbox.appendChild(betEditor(grp,'group_pick',STAKE.group_pick));
   // pick of the day: choose the race, then the horse
   const podbox=v.querySelector('#podbox');
   const podRace = podPick ? raceById(podPick) : (myPod ? raceById(myPod.race_id) : null);  // the race you just chose wins
@@ -464,14 +465,14 @@ function renderBets(){
     sel.querySelector('select').onchange=e=>{ podPick=Number(e.target.value)||null; S.dirty=false; render(); };
     podbox.appendChild(sel);
   }
-  if(podRace) podbox.appendChild(betEditor(podRace,'pick_of_day',25));
+  if(podRace) podbox.appendChild(betEditor(podRace,'pick_of_day',STAKE.pick_of_day));
   // 5 individual bets
   const indbox=v.querySelector('#indbox');
   races.forEach(r=>{
     const mine=myBet(r.id,'individual');
     if(rep.has(r.id) && !mine) return;                        // no double-dipping: hidden
     if(!mine && ((podRace && r.id===podRace.id) || (myPod && r.id===myPod.race_id))) return;   // that's your Pick of the Day race
-    indbox.appendChild(betEditor(r,'individual',10, rep.has(r.id)));
+    indbox.appendChild(betEditor(r,'individual',STAKE.individual, rep.has(r.id)));
   });
   return v;
 }
@@ -628,8 +629,8 @@ function renderRules(){
     ${closeBar()}
     <div class="card"><h3>⚡ Your day, ${esc(me.display_name||'')}</h3>
       <ul>
-        <li><b>Your group pick:</b> ${pod?`<b>R${pod.race_no} ${esc(pod.track)} ${esc(pod.name)}</b>, ${melbTime(pod.jump_time)}`:'not drawn yet'}. Pick one horse for your team ($25).</li>
-        <li><b>Pick of the Day:</b> your own best bet, any race. $25, double points.</li>
+        <li><b>Your group pick:</b> ${pod?`<b>R${pod.race_no} ${esc(pod.track)} ${esc(pod.name)}</b>, ${melbTime(pod.jump_time)}`:'not drawn yet'}. Pick one horse for your team ($${STAKE.group_pick}).</li>
+        <li><b>Pick of the Day:</b> your own best bet, any race. $${STAKE.pick_of_day}, double points.</li>
         ${myQ?`<li><b>Your Flem quaddie legs:</b> ${myQ}</li>`:''}
         <li><b>Rosehill quaddie:</b> everyone picks one horse in each of R7–R10.</li>
         <li><b>Feature (Champions Stakes, 5:10pm):</b> vote your team's horse in Games → Feature.</li>
@@ -640,7 +641,7 @@ function renderRules(){
         <li>Go to <b>My Bets</b>.</li>
         <li>Pick your horse and tap <b>Pick</b>. <b>No odds needed.</b> You can change it until picks close.</li>
         <li><b>All picks close at ${melbTime(betsCloseAt().toISOString())}</b>: bets, Pick of the Day, group pick, quaddie legs and Feature votes. ${esc(adminNames())} then put them on Sportsbet, and the odds you got show on each bet.</li>
-        <li>You get a <b>group pick</b> (your drawn race, for your team), your own <b>Pick of the Day</b> (any race, $25, ×2), and <b>5 bets × $10</b> on any races.</li>
+        <li>You get a <b>group pick</b> (your drawn race, for your team), your own <b>Pick of the Day</b> (any race, $${STAKE.pick_of_day}, ×2), and <b>5 bets × $${STAKE.individual}</b> on any races.</li>
         <li><b>No double-dipping:</b> races where you're repping the group (your group-pick race and your quaddie legs) don't show in your bets.</li>
         <li><b>Scratched?</b> You'll see a ⚠️, so pick again. If you leave it, the bet refunds (0 pts).</li>
       </ol></div>
@@ -648,15 +649,15 @@ function renderRules(){
     <div class="card"><h3>🎲 The games</h3>
       <table>
         <tr><td><b>Your 5 bets</b><br><span class="mut small">Your picks, any races</span></td><td>5 × $10</td></tr>
-        <tr><td><b>🎯 Pick of the Day</b><br><span class="mut small">Your best bet: any race, a bit more on</span></td><td>16 × $25 · ×2</td></tr>
-        <tr><td><b>👥 Group pick</b><br><span class="mut small">Drawn race, one guy v one girl in each (Steaks race excluded: that's the Feature)</span></td><td>16 × $25</td></tr>
+        <tr><td><b>🎯 Pick of the Day</b><br><span class="mut small">Your best bet: any race, a bit more on</span></td><td>16 × $${STAKE.pick_of_day} · ×2</td></tr>
+        <tr><td><b>👥 Group pick</b><br><span class="mut small">Drawn race, one guy v one girl in each (Steaks race excluded: that's the Feature)</span></td><td>16 × $${STAKE.group_pick}</td></tr>
         <tr><td><b>🐎 Boys Flem quaddie</b> (R6–R9)<br><span class="mut small">Drawn 4 + 4: you pick in your 2 legs</span></td><td>$125</td></tr>
         <tr><td><b>🐎 Girls Flem quaddie</b> (R6–R9)<br><span class="mut small">Same as the boys</span></td><td>$125</td></tr>
         <tr><td><b>🐎 Rosehill mixed quaddie</b> (R7–R10)<br><span class="mut small">All 16 pick every leg</span></td><td>$200</td></tr>
         <tr><td><b>🥩 Steaks Day Feature</b> (Flem R8, 5:10pm)<br><span class="mut small">Team vote: guys' horse v girls' horse, $100 each-way each. 🥂 Glasses up!</span></td><td>$200 · ×3</td></tr>
         <tr><td><b>🆓 Get Out of Jail</b><br><span class="mut small">Guys on Flem R9 · Girls on Rose R10</span></td><td>2 × $25</td></tr>
         <tr><td><b>🎡 Mysteries</b><br><span class="mut small">In the Wheel tab: it picks a race, then a horse. Watch it spin live!</span></td><td>4 × $25</td></tr>
-        <tr><td><b>Total</b></td><td>$2,400</td></tr>
+        <tr><td><b>Total</b></td><td>$2,000</td></tr>
       </table></div>
 
     <div class="card"><h3>🏆 Points & boards</h3>
