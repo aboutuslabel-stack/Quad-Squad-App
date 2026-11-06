@@ -698,8 +698,11 @@ async function spinMystery(m){
   msg(`🎡 ${m.label}: R${race.race_no} ${race.name} → #${rn}`); await loadAll(); render();
 }
 async function openMysteryWheel(m){
-  const races=(S.data.races||[]).filter(r=>r.track===m.track).sort((a,b)=>a.sort_order-b.sort_order);
-  if(!races.length){ spinMystery(m); return; }
+  if(m.race_id && !confirm(`Re-spin ${m.label}? It's already on R${raceById(m.race_id)?.race_no} #${m.runner_number}.`)) return;
+  // same rule as spinMystery: only races still open for betting that have a field loaded
+  const live=r=>(S.data.runners||[]).filter(x=>x.race_id===r.id&&!x.scratched);
+  const races=(S.data.races||[]).filter(r=>r.track===m.track && !isLocked(r) && live(r).length).sort((a,b)=>a.sort_order-b.sort_order);
+  if(!races.length){ alert(`No open ${m.track} race with a field loaded. Load runners first.`); return; }
   const ov=el(`<div class="wheelwrap">
     <div style="font-size:13px;color:var(--mut)">🎡 ${esc(m.label)}</div>
     <div class="wtitle" id="wtitle"></div>
@@ -713,11 +716,11 @@ async function openMysteryWheel(m){
   const ri=await wheelSpin(stage,ctrl,races.map(r=>'R'+r.race_no));
   const race=races[ri];
   wt.textContent='Spin 2 — the HORSE · R'+race.race_no;
-  const runners=(S.data.runners||[]).filter(x=>x.race_id===race.id&&!x.scratched).sort((a,b)=>a.number-b.number);
-  const nums=runners.length?runners.map(r=>r.number):Array.from({length:12},(_,i)=>i+1);
+  const nums=live(race).sort((a,b)=>a.number-b.number).map(r=>r.number);
   const hi=await wheelSpin(stage,ctrl,nums.map(n=>'#'+n));
   const rn=nums[hi];
-  await sb.from('group_bets').update({race_id:race.id,runner_number:rn}).eq('id',m.id);
+  const {error}=await sb.from('group_bets').update({race_id:race.id,runner_number:rn,odds:null}).eq('id',m.id);
+  if(error){ alert(error.message); ov.remove(); return; }
   wt.textContent='🥂 Locked in!';
   stage.innerHTML=`<div class="bigreveal">${esc(m.label)}<br><b>R${race.race_no} ${esc(race.name)}</b><br>→ <b style="font-size:30px;color:var(--gold)">#${rn}</b></div>`;
   ctrl.innerHTML='';
