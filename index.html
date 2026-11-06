@@ -72,6 +72,15 @@
   .race{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
   .race .tno{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto}
   .race .flem{background:rgba(47,111,176,.22);color:#bcd7f2}
+  .reps{margin-top:6px;display:grid;gap:3px}
+  .reps div{font-size:12px;color:#cfe0d8;line-height:1.35}
+  .reps .me{color:var(--gold);font-weight:800}
+  .rules h3{margin:4px 0 6px;font-size:16px}
+  .rules p,.rules li{font-size:14px;line-height:1.5;color:#dfeae5}
+  .rules ul,.rules ol{margin:4px 0;padding-left:20px}
+  .rules table{width:100%;border-collapse:collapse;font-size:13px}
+  .rules td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  .rules td:last-child{text-align:right;white-space:nowrap;color:var(--gold2);font-weight:700}
   .race .rose{background:rgba(228,184,74,.18);color:var(--gold2)}
   .overlay{position:fixed;inset:0;background:rgba(3,14,10,.97);z-index:50;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
   .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:2px solid var(--gold);border-radius:18px 18px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));z-index:60;max-height:86vh;overflow:auto}
@@ -105,6 +114,7 @@
     <a data-view="races"><span class="ic">🐎</span>Races</a>
     <a data-view="bets"><span class="ic">🎰</span>My Bets</a>
     <a data-view="games"><span class="ic">🎲</span>Games</a>
+    <a data-view="rules"><span class="ic">📖</span>Rules</a>
     <a data-view="admin" id="navAdmin" style="display:none"><span class="ic">🛠️</span>Admin</a>
   </div>
 </nav>
@@ -189,7 +199,7 @@ function render(){
   $('#navAdmin').style.display = (me && me.is_admin)?'':'none';
   document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.view===S.view));
   const app = $('#app');
-  const views = {home:renderHome, races:renderRaces, bets:renderBets, games:renderGames, admin:renderAdmin};
+  const views = {home:renderHome, races:renderRaces, bets:renderBets, games:renderGames, rules:renderRules, admin:renderAdmin};
   const y = window.scrollY;
   app.innerHTML = '';
   app.appendChild((views[S.view]||renderHome)());
@@ -315,6 +325,35 @@ function renderBoard(box){
 function coupleLabel(cid){const c=(S.data.couples||[]).find(c=>c.id===cid);return c?c.label:'';}
 
 // ---------- races ----------
+// Who is repping this race: Pick-of-the-Day pair, quaddie legs, feature, get-out and any mystery that landed here.
+function raceReps(r){
+  const P=id=>(S.data.players||[]).find(p=>p.id===id);
+  const nm=p=>p?`<span class="${p.id===S.me?'me':''}">${esc(p.id===S.me?'You':p.display_name)}</span>`:'?';
+  const out=[];
+  const pod=(S.data.pod_assignments||[]).filter(a=>a.race_id===r.id).map(a=>P(a.player_id)).filter(Boolean);
+  if(pod.length){
+    const m=pod.filter(p=>p.gender==='M'), f=pod.filter(p=>p.gender==='F');
+    out.push(`🎯 Pick of the Day: 👔 ${m.map(nm).join(', ')||'—'} <span class="mut">v</span> 👗 ${f.map(nm).join(', ')||'—'}`);
+  }
+  (S.data.quaddies||[]).forEach(q=>{
+    const li=(q.leg_race_ids||[]).indexOf(r.id); if(li<0) return;
+    if(q.style==='split'){
+      const grp=li<2?'first':'last';
+      const who=(S.data.quaddie_groups||[]).filter(g=>g.quaddie_id===q.id&&g.grp===grp).map(g=>P(g.player_id)).filter(Boolean);
+      out.push(`🐎 ${q.gender_scope==='M'?'👔 Boys':'👗 Girls'} Flem quaddie leg ${li+1}: ${who.length?who.map(nm).join(', '):'<span class="mut">draw pending</span>'}`);
+    } else out.push(`🐎 Rosehill quaddie leg ${li+1}: everyone picks a number`);
+  });
+  if(r.id===108){
+    const fp=g=>(S.data.feature_picks||[]).find(p=>p.gender===g);
+    const show=g=>{const p=fp(g);return p&&p.locked&&p.runner_number?`#${p.runner_number}`:'team vote';};
+    out.push(`🥩 Feature ×3 · $100 e/w each: 👔 Guys ${show('M')} <span class="mut">v</span> 👗 Girls ${show('F')}`);
+  }
+  (S.data.group_bets||[]).filter(g=>g.category==='getout'&&g.race_id===r.id).forEach(g=>
+    out.push(`🆓 Get Out of Jail: ${g.gender_scope==='M'?'👔 Guys':'👗 Girls'}${g.runner_number?` #${g.runner_number}`:''}`));
+  (S.data.group_bets||[]).filter(g=>g.category==='mystery'&&g.race_id===r.id).forEach(g=>
+    out.push(`🎡 ${esc(g.label)} → #${g.runner_number}`));
+  return out;
+}
 function renderRaces(){
   const races=(S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
   const v=el(`<div class="wrap"><h2 style="margin-top:14px">🐎 Race Timeline</h2>
@@ -322,13 +361,15 @@ function renderRaces(){
   const box=v.querySelector('#rl');
   races.forEach(r=>{
     const locked=isLocked(r); const resulted=r.status==='resulted';
-    const runnersN=(S.data.runners||[]).filter(x=>x.race_id===r.id).length;
+    const rAll=(S.data.runners||[]).filter(x=>x.race_id===r.id), rScr=rAll.filter(x=>x.scratched).length, runnersN=rAll.length-rScr;
+    const reps=raceReps(r);
     let st = resulted?`<span class="pill done">RESULT ${r.result_win?('#'+r.result_win):''}</span>`
              : locked?`<span class="pill lock">LOCKED</span>`
              : `<span class="count" data-jt="${r.jump_time}">—</span>`;
     box.appendChild(el(`<div class="race"><div class="tno ${r.track==='Flemington'?'flem':'rose'}">R${r.race_no}</div>
       <div style="flex:1"><div style="font-weight:700">${esc(r.name)}${r.id===108?' 🥩':''}</div>
-        <div class="mut small">${esc(r.track)} · ${esc(r.distance||'')} ${r.grade?('· '+esc(r.grade)):''} · ${melbTime(r.jump_time)}${runnersN?` · ${runnersN} runners`:' · fields TBD'}</div></div>
+        <div class="mut small">${esc(r.track)} · ${esc(r.distance||'')} ${r.grade?('· '+esc(r.grade)):''} · ${melbTime(r.jump_time)}${rAll.length?` · ${runnersN} runners${rScr?` (${rScr} scr)`:''}`:' · fields TBD'}</div>
+        ${reps.length?`<div class="reps">${reps.map(x=>`<div>${x}</div>`).join('')}</div>`:''}</div>
       <div style="text-align:right">${st}</div></div>`));
   });
   return v;
@@ -427,6 +468,84 @@ function betEditor(race,type,stake,blocked){
     await loadAll(); render();
   };
   return box;
+}
+
+// ---------- rules / how to play ----------
+function renderRules(){
+  const me=myPlayer()||{};
+  const pod=myPodRace();
+  const myQ=(S.data.quaddie_groups||[]).filter(g=>g.player_id===S.me).map(g=>{
+    const q=(S.data.quaddies||[]).find(q=>q.id===g.quaddie_id); if(!q) return '';
+    const legs=(q.leg_race_ids||[]).map(raceById); const mine=g.grp==='first'?[legs[0],legs[1]]:[legs[2],legs[3]];
+    return mine.filter(Boolean).map(r=>`R${r.race_no} ${melbTime(r.jump_time)}`).join(' & ');
+  }).filter(Boolean).join('; ');
+  const v=el(`<div class="wrap rules"><h2 style="margin-top:14px">📖 How it works</h2>
+    <p class="hint">Steaks Day · Flemington × Rosehill · first race 2:30pm (Melbourne). Real money on Sportsbet, one live leaderboard, and Guys v Girls.</p>
+
+    <div class="card"><h3>⚡ Your day, ${esc(me.display_name||'')}</h3>
+      <ul>
+        <li><b>Pick of the Day:</b> ${pod?`<b>R${pod.race_no} ${esc(pod.track)} ${esc(pod.name)}</b>, ${melbTime(pod.jump_time)}`:'not drawn yet'}. $25, double points.</li>
+        ${myQ?`<li><b>Your Flem quaddie legs:</b> ${myQ}</li>`:''}
+        <li><b>Rosehill quaddie:</b> everyone picks one horse in each of R7–R10.</li>
+        <li><b>Feature (Champions Stakes, 5:10pm):</b> vote your team's horse in Games → Feature.</li>
+      </ul></div>
+
+    <div class="card"><h3>🎰 Placing a bet</h3>
+      <ol>
+        <li>Go to <b>My Bets</b>.</li>
+        <li>Pick your horse, then type in the <b>Sportsbet odds</b> (e.g. 4.50). Tap <b>Place</b>. You can change it any time before the jump.</li>
+        <li>Bets <b>lock at the jump</b>, and the countdowns are on the Races tab.</li>
+        <li>You get <b>5 bets × $10</b> on any races, plus your <b>Pick of the Day</b>.</li>
+        <li><b>No double-dipping:</b> races where you're repping the group (your Pick of the Day and your quaddie legs) don't show in your 5 bets.</li>
+        <li><b>Scratched?</b> You'll see a ⚠️, so pick again. If you leave it, the bet refunds (0 pts).</li>
+      </ol></div>
+
+    <div class="card"><h3>🎲 The games</h3>
+      <table>
+        <tr><td><b>Your 5 bets</b><br><span class="mut small">Your picks, any races</span></td><td>5 × $10</td></tr>
+        <tr><td><b>🎯 Pick of the Day</b><br><span class="mut small">Drawn race, one guy v one girl in each</span></td><td>$25 · ×2</td></tr>
+        <tr><td><b>🐎 Boys Flem quaddie</b> (R6–R9)<br><span class="mut small">Drawn 4 + 4: you pick in your 2 legs</span></td><td>$125</td></tr>
+        <tr><td><b>🐎 Girls Flem quaddie</b> (R6–R9)<br><span class="mut small">Same as the boys</span></td><td>$125</td></tr>
+        <tr><td><b>🐎 Rosehill mixed quaddie</b> (R7–R10)<br><span class="mut small">All 16 pick every leg</span></td><td>$200</td></tr>
+        <tr><td><b>🥩 Steaks Day Feature</b> (Flem R8, 5:10pm)<br><span class="mut small">Team vote: guys' horse v girls' horse, $100 each-way each. 🥂 Glasses up!</span></td><td>$200 · ×3</td></tr>
+        <tr><td><b>🆓 Get Out of Jail</b><br><span class="mut small">Guys on Flem R9 · Girls on Rose R10</span></td><td>2 × $25</td></tr>
+        <tr><td><b>🎡 Mysteries</b><br><span class="mut small">The wheel picks a race, then a horse. Watch it spin live!</span></td><td>4 × $25</td></tr>
+        <tr><td><b>Total pot</b></td><td>$2,000</td></tr>
+      </table></div>
+
+    <div class="card"><h3>🏆 Points & boards</h3>
+      <ul>
+        <li><b>Points = profit.</b> A win scores stake × odds − stake (e.g. $10 @ 4.50 = +35). A loss scores −stake.</li>
+        <li><b>Pick of the Day ×2</b>, <b>Feature ×3</b>. Each-way is half on the win and half on the place.</li>
+        <li><b>Quaddies:</b> +${QUADDIE_LEG_PTS} for every leg you pick right, to your team. Once all 4 legs are run, the Sportsbet return minus the stake is added (the Rosehill quaddie splits 50/50).</li>
+        <li><b>Players & Couples</b> boards count your own 6 bets. <b>Guys v Girls</b> counts everything, including the team games.</li>
+        <li>🥄 <b>Mug Punter</b> = last on the Players board when the day ends.</li>
+        <li>The <b>Group P&L</b> up top is the real money back from Sportsbet.</li>
+      </ul></div>
+
+    <div class="card"><h3>⏰ Key times</h3>
+      <table>
+        <tr><td>First race · Fisher Stakes</td><td>2:30pm</td></tr>
+        <tr><td>Flem quaddie starts (R6)</td><td>3:50pm</td></tr>
+        <tr><td>Rosehill quaddie starts (R7)</td><td>4:10pm</td></tr>
+        <tr><td>🥩 Feature votes lock before</td><td>5:10pm</td></tr>
+        <tr><td>Last race · Rose R10</td><td>6:05pm</td></tr>
+      </table></div>
+
+    ${me.is_admin?`<div class="card"><h3>🛠️ Admin: running the day</h3>
+      <ol>
+        <li><b>Fields:</b> loaded. Late scratchings go in Admin → the race → <i>Field · load / scratch</i> → tap the horse.</li>
+        <li><b>Draws:</b> Pick of the Day and the Flem quaddie splits are done. Re-drawing asks first.</li>
+        <li><b>Mysteries:</b> Admin → Spin. The wheel spins live on every open phone.</li>
+        <li><b>Team bets:</b> Admin → <i>Group bets: horse & odds</i>. Enter the Get Out horses and the odds you took for each team bet.</li>
+        <li><b>Feature:</b> tap <i>Lock feature votes</i> before 5:10, then enter both teams' odds.</li>
+        <li><b>Each result:</b> the race → Winner # (+ placed #s for each-way) → <b>Settle</b>. The board moves straight away. Re-settling is safe.</li>
+        <li><b>Quaddies:</b> after the last leg, enter the $ returned in <i>Quaddie returns</i> (0 if it missed).</li>
+        <li><b>Group P&L:</b> update the total $ returned from Sportsbet as you go.</li>
+      </ol></div>`:''}
+    <p class="tagline">Tip: Share → Add to Home Screen for the full-screen app.</p>
+  </div>`);
+  return v;
 }
 
 // ---------- games ----------
