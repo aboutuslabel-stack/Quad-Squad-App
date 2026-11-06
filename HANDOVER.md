@@ -31,7 +31,7 @@ _Last updated: 6 Nov 2026 (night before)_
 - **Realtime** sync across devices
 
 ## ✅ Added since first handover
-- **🎡 Spin-wheel** — animated two-stage wheel (race → horse) on the admin's phone. Only spins onto races still open with a field loaded; asks before a re-spin.
+- **🎡 Spin-wheel — live on every phone** — admin taps Spin (Admin → Spin a Mystery) and the two-stage wheel (race → horse) pops up and spins in sync on everyone's open app (Supabase Realtime broadcast, no DB rows). Only spins onto races still open with a field loaded; asks before a re-spin. Anyone who closes it or misses it sees the result in Games → Mysteries.
 - **Runner fields in-app** — Admin → each race → paste the field → **Load / update field**. Scratch runners there too; scratched bets refund (0 pts).
 - **Quaddie scoring** — 10 pts per correct leg to the picker's team, plus the Sportsbet return (entered in Admin) minus stake once all 4 legs are run. Mixed quaddie splits 50/50.
 - **Team-bet odds** — Admin sets horse + odds for Feature, Get Out of Jail and Mysteries. Settling skips and flags any team bet with no horse/odds instead of scoring it a loss.
@@ -41,7 +41,7 @@ _Last updated: 6 Nov 2026 (night before)_
 ## ⚠️ Still open
 1. **Runner fields not loaded yet** — picks are by number until you load them (Admin, per race).
 2. **Feature each-way payout** — approximated (place ≈ ¼ of win odds). Sanity-check the number after R8.
-3. **Wheel only animates on the admin's phone** — everyone else sees the result appear in Mysteries. Hold the phone up / cast it.
+3. **Live wheel needs the app open** — phones that are locked or have the app closed miss the animation (they still see the result in Mysteries).
 4. **Push notifications / alerts** — not built.
 5. **No full click-through test** — plumbing verified (site serves, DB reads, code checks), game flows not tested end to end.
 6. **Elly's spelling** and **player photos** still to come.

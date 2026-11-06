@@ -760,69 +760,152 @@ async function spinMystery(m){
   if(error){ alert(error.message); return; }
   msg(`🎡 ${m.label}: R${race.race_no} ${race.name} → #${rn}`); await loadAll(); render();
 }
+// ---------- the Mystery wheel, live on every phone ----------
+// The admin's phone drives the spin and broadcasts each step (open → spin to angle T → reveal) over
+// Supabase Realtime broadcast — no DB rows. Every other phone builds the same wheel and animates to the
+// same angle, so the whole squad watches it land together. The result is still saved to group_bets,
+// so anyone who missed it sees it in Games → Mysteries.
+const WHEEL_EVENT='w';
+let wheelCh=null;
+function wheelBus(){ return window.__wheelBus || { send:p=>wheelCh&&wheelCh.send({type:'broadcast',event:WHEEL_EVENT,payload:p}).catch(()=>{}) }; }
+function wheelSend(p){ try{ wheelBus().send(p); }catch(e){} }
+function wheelOverlay(label,sub){
+  document.querySelectorAll('.wheelwrap').forEach(x=>x.remove());
+  const ov=el(`<div class="wheelwrap">
+    <div style="font-size:13px;color:var(--mut)">🎡 ${esc(label)}</div>
+    <div class="small wsub" style="color:var(--gold2);margin-top:4px">${esc(sub||'')}</div>
+    <div class="wtitle"></div>
+    <div class="wst"></div>
+    <div class="wctrl" style="margin-top:14px"></div>
+    <button class="btn sec sm wclose" style="margin-top:16px">Close</button></div>`);
+  document.body.appendChild(ov);
+  return {ov, sub:ov.querySelector('.wsub'), wt:ov.querySelector('.wtitle'), stage:ov.querySelector('.wst'), ctrl:ov.querySelector('.wctrl'), close:ov.querySelector('.wclose')};
+}
+function buildWheel(stage,labels){
+  const N=labels.length, seg=360/N;
+  const cols=['#0f5138','#124031','#1a5a3f','#0c3f2d'];
+  const stops=labels.map((_,i)=>`${cols[i%cols.length]} ${i*seg}deg ${(i+1)*seg}deg`).join(',');
+  stage.innerHTML='';
+  const wrap=el(`<div class="wheelstage"><div class="wpointer"></div><div class="wheel"></div><div class="whub">🐎</div></div>`);
+  const wheel=wrap.querySelector('.wheel');
+  wheel.style.background=`conic-gradient(${stops})`;
+  labels.forEach((t,i)=>{
+    const lab=el(`<div class="lab">${esc(t)}</div>`);
+    lab.style.transform=`translate(-50%,-50%) rotate(${i*seg+seg/2}deg) translateY(-116px)`;
+    wheel.appendChild(lab);
+  });
+  stage.appendChild(wrap);
+  return wheel;
+}
+// random segment + final angle (fresh wheel starts at 0°, so ≥6 full turns then land on segment i)
+function pickTarget(N){
+  const seg=360/N, i=Math.floor(Math.random()*N), center=i*seg+seg/2;
+  return { i, T: ((360-center)%360) + (Math.random()-0.5)*seg*0.5 + 6*360 };
+}
+function spinTo(wheel,T){
+  return new Promise(res=>{
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ wheel.style.transform=`rotate(${T}deg)`; }));
+    let done=false; const f=()=>{ if(done) return; done=true; res(); };
+    wheel.addEventListener('transitionend',f,{once:true}); setTimeout(f,5600);
+  });
+}
+function waitSpinTap(ctrl){
+  return new Promise(res=>{
+    ctrl.innerHTML='';
+    const b=el(`<button class="btn" style="font-size:18px;padding:14px 30px">🎡 SPIN</button>`);
+    b.onclick=()=>{ b.disabled=true; res(); };
+    ctrl.appendChild(b);
+  });
+}
+function revealHtml(p){
+  return `<div class="bigreveal">${esc(p.label)}<br><b>R${esc(p.raceNo)} ${esc(p.raceName)}</b><br>→ <b style="font-size:30px;color:var(--gold)">#${esc(p.rn)}</b>${p.horse?`<br><span style="font-size:18px">${esc(p.horse)}</span>`:''}</div>`;
+}
+
+// Admin: drive the spin
 async function openMysteryWheel(m){
   if(m.race_id && !confirm(`Re-spin ${m.label}? It's already on R${raceById(m.race_id)?.race_no} #${m.runner_number}.`)) return;
+  await loadAll();
   // same rule as spinMystery: only races still open for betting that have a field loaded
   const live=r=>(S.data.runners||[]).filter(x=>x.race_id===r.id&&!x.scratched);
   const races=(S.data.races||[]).filter(r=>r.track===m.track && !isLocked(r) && live(r).length).sort((a,b)=>a.sort_order-b.sort_order);
   if(!races.length){ alert(`No open ${m.track} race with a field loaded. Load runners first.`); return; }
-  const ov=el(`<div class="wheelwrap">
-    <div style="font-size:13px;color:var(--mut)">🎡 ${esc(m.label)}</div>
-    <div class="wtitle" id="wtitle"></div>
-    <div id="stage"></div>
-    <div id="ctrl" style="margin-top:14px"></div>
-    <button class="btn sec sm" id="wclose" style="margin-top:16px">Close</button></div>`);
-  document.body.appendChild(ov);
-  ov.querySelector('#wclose').onclick=()=>ov.remove();
-  const stage=ov.querySelector('#stage'), ctrl=ov.querySelector('#ctrl'), wt=ov.querySelector('#wtitle');
-  wt.textContent='Spin 1 — the RACE';
-  const ri=await wheelSpin(stage,ctrl,races.map(r=>'R'+r.race_no));
-  const race=races[ri];
-  wt.textContent='Spin 2 — the HORSE · R'+race.race_no;
-  const nums=live(race).sort((a,b)=>a.number-b.number).map(r=>r.number);
-  const hi=await wheelSpin(stage,ctrl,nums.map(n=>'#'+n));
-  const rn=nums[hi];
-  const {error}=await sb.from('group_bets').update({race_id:race.id,runner_number:rn,odds:null}).eq('id',m.id);
-  if(error){ alert(error.message); ov.remove(); return; }
-  wt.textContent='🥂 Locked in!';
-  stage.innerHTML=`<div class="bigreveal">${esc(m.label)}<br><b>R${race.race_no} ${esc(race.name)}</b><br>→ <b style="font-size:30px;color:var(--gold)">#${rn}</b></div>`;
-  ctrl.innerHTML='';
-  const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=async()=>{ov.remove();await loadAll();render();}; ctrl.appendChild(d);
+  const by=(myPlayer()||{}).display_name||'Admin';
+  const W=wheelOverlay(m.label,'📡 Live on every phone');
+  let saved=false;
+  W.close.onclick=()=>{ W.ov.remove(); if(!saved) wheelSend({t:'close',label:m.label}); };
+  // spin 1 — the race
+  const raceLabels=races.map(r=>'R'+r.race_no);
+  const t1='Spin 1 — the RACE';
+  W.wt.textContent=t1;
+  let wheel=buildWheel(W.stage,raceLabels);
+  wheelSend({t:'open',label:m.label,by,stage:1,title:t1,labels:raceLabels});
+  await waitSpinTap(W.ctrl);
+  let pick=pickTarget(raceLabels.length);
+  wheelSend({t:'spin',stage:1,T:pick.T});
+  W.ctrl.innerHTML='<div class="count">Spinning…</div>';
+  await spinTo(wheel,pick.T);
+  if(!document.body.contains(W.ov)) return;
+  const race=races[pick.i];
+  // spin 2 — the horse
+  const field=live(race).sort((a,b)=>a.number-b.number);
+  const horseLabels=field.map(r=>'#'+r.number);
+  const t2=`Spin 2 — the HORSE · R${race.race_no} ${race.track.slice(0,4)}`;
+  const landed=`R${race.race_no} ${race.name}`;
+  W.wt.textContent=t2; W.sub.textContent='Race: '+landed;
+  wheel=buildWheel(W.stage,horseLabels);
+  wheelSend({t:'open',label:m.label,by,stage:2,title:t2,labels:horseLabels,landed});
+  await waitSpinTap(W.ctrl);
+  pick=pickTarget(horseLabels.length);
+  wheelSend({t:'spin',stage:2,T:pick.T});
+  W.ctrl.innerHTML='<div class="count">Spinning…</div>';
+  await spinTo(wheel,pick.T);
+  if(!document.body.contains(W.ov)) return;
+  const runner=field[pick.i];
+  const {error}=await sb.from('group_bets').update({race_id:race.id,runner_number:runner.number,odds:null}).eq('id',m.id);
+  if(error){ alert(error.message); wheelSend({t:'close',label:m.label}); W.ov.remove(); return; }
+  saved=true;
+  const rv={label:m.label,raceNo:race.race_no,raceName:race.name,rn:runner.number,horse:runner.horse_name};
+  wheelSend({t:'reveal',...rv});
+  W.wt.textContent='🥂 Locked in!';
+  W.stage.innerHTML=revealHtml(rv);
+  W.ctrl.innerHTML='';
+  const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=async()=>{W.ov.remove();await loadAll();render();}; W.ctrl.appendChild(d);
 }
-function wheelSpin(stage,ctrl,labels){
-  return new Promise(resolve=>{
-    const N=labels.length, seg=360/N;
-    const cols=['#0f5138','#124031','#1a5a3f','#0c3f2d'];
-    const stops=labels.map((_,i)=>`${cols[i%cols.length]} ${i*seg}deg ${(i+1)*seg}deg`).join(',');
-    stage.innerHTML='';
-    const wrap=el(`<div class="wheelstage"><div class="wpointer"></div><div class="wheel"></div><div class="whub">🐎</div></div>`);
-    const wheel=wrap.querySelector('.wheel');
-    wheel.style.background=`conic-gradient(${stops})`;
-    labels.forEach((t,i)=>{
-      const c=i*seg+seg/2;
-      const lab=el(`<div class="lab">${esc(t)}</div>`);
-      lab.style.transform=`translate(-50%,-50%) rotate(${c}deg) translateY(-116px)`;
-      wheel.appendChild(lab);
+
+// Everyone else: watch the admin's spin
+const WV={W:null,wheel:null,anim:Promise.resolve(),dismissed:null};
+function onWheelMsg(p){
+  if(!p || !S.me) return;
+  const open=()=>WV.W && document.body.contains(WV.W.ov);
+  if(p.t==='open'){
+    if(p.stage===1) WV.dismissed=null;
+    if(WV.dismissed===p.label) return;          // they closed it — don't keep popping it back up
+    if(!open()){
+      WV.W=wheelOverlay(p.label,`📡 ${p.by} is spinning live`);
+      WV.W.close.onclick=()=>{ WV.dismissed=WV.W.ov.dataset.label; WV.W.ov.remove(); };
+    }
+    WV.W.ov.dataset.label=p.label;
+    WV.W.wt.textContent=p.title;
+    if(p.landed) WV.W.sub.textContent='Race: '+p.landed;
+    WV.wheel=buildWheel(WV.W.stage,p.labels);
+    WV.W.ctrl.innerHTML=`<div class="mut small">Waiting for ${esc(p.by)} to spin…</div>`;
+  } else if(p.t==='spin'){
+    if(!open()||!WV.wheel) return;
+    WV.W.ctrl.innerHTML='<div class="count">Spinning…</div>';
+    WV.anim=spinTo(WV.wheel,p.T);
+  } else if(p.t==='reveal'){
+    if(!open()) return;
+    const W=WV.W;
+    WV.anim.then(()=>{
+      if(!document.body.contains(W.ov)) return;
+      W.wt.textContent='🥂 Locked in!';
+      W.stage.innerHTML=revealHtml(p);
+      W.ctrl.innerHTML='';
+      const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=()=>W.ov.remove(); W.ctrl.appendChild(d);
     });
-    stage.appendChild(wrap);
-    ctrl.innerHTML='';
-    const btn=el(`<button class="btn" style="font-size:18px;padding:14px 30px">🎡 SPIN</button>`);
-    ctrl.appendChild(btn);
-    let cur=0;
-    btn.onclick=()=>{
-      btn.disabled=true;
-      const i=Math.floor(Math.random()*N);
-      const center=i*seg+seg/2;
-      const want=((360-center)%360)+(Math.random()-0.5)*seg*0.5;
-      let T=cur-(cur%360)+want+6*360;
-      if(T<=cur+360) T+=360;
-      cur=T;
-      requestAnimationFrame(()=>{wheel.style.transform=`rotate(${T}deg)`;});
-      let done=false; const finish=()=>{if(done)return;done=true;resolve(i);};
-      wheel.addEventListener('transitionend',finish,{once:true});
-      setTimeout(finish,5600);
-    };
-  });
+  } else if(p.t==='close'){
+    if(open()){ WV.W.wt.textContent='Spin cancelled'; WV.W.ctrl.innerHTML=''; setTimeout(()=>{ if(open()) WV.W.ov.remove(); },1500); }
+  }
 }
 async function settleRace(r,winStr,plcStr){
   const win=Number(winStr); if(!win){alert('Enter winner #');return;}
@@ -887,6 +970,9 @@ async function boot(){
   sb.channel('qs').on('postgres_changes',{event:'*',schema:'public'},()=>{
     clearTimeout(t); t=setTimeout(async()=>{ await loadAll(); liveRender(); },400);
   }).subscribe();
+  // live Mystery wheel (broadcast only — the admin's own phone doesn't receive its own messages)
+  if(window.__wheelBus) window.__wheelBus.listen(onWheelMsg);
+  else wheelCh=sb.channel('qs-wheel',{config:{broadcast:{self:false}}}).on('broadcast',{event:WHEEL_EVENT},({payload})=>onWheelMsg(payload)).subscribe();
 }
 boot().catch(e=>{ $('#app').innerHTML=`<div class="wrap"><div class="card warn">Load error: ${esc(e.message)}<br><br>If this is the first run, the database tables may not be applied yet.</div></div>`; });
 </script>
