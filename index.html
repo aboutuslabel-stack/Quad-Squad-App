@@ -354,6 +354,12 @@ function myQuaddieLegRaces(){
   });
   return out;
 }
+// Lock is enforced on save too: a form drawn before the jump must not save after it.
+async function jumped(race){
+  await loadAll();
+  if(isLocked(raceById(race.id))){ alert('This race has jumped — picks are locked.'); render(); return true; }
+  return false;
+}
 function myBet(raceId,type){ return (S.data.bets||[]).find(b=>b.player_id===S.me&&b.race_id===raceId&&b.bet_type===type); }
 function renderBets(){
   const me=myPlayer();
@@ -405,6 +411,7 @@ function betEditor(race,type,stake,blocked){
     <button class="btn sm save">${mine?'Update':'Place'}</button></div>`);
   box.appendChild(ed);
   ed.querySelector('.save').onclick=async()=>{
+    if(await jumped(race)) return;
     const rn = (ed.querySelector('.rn')||ed.querySelector('.rn2')).value;
     const od = ed.querySelector('.od').value;
     if(!rn){ alert('Pick a runner'); return; }
@@ -480,6 +487,7 @@ function quaddieLeg(q,race,legIndex){
     <button class="btn sm save" ${locked?'disabled':''}>${mine?'✓':'Save'}</button></div>`);
   const warn = mine && !locked && isScratched(race.id,mine.runner_number);
   if(!locked) row.querySelector('.save').onclick=async()=>{
+    if(await jumped(race)) return;
     const rn=(row.querySelector('.rn')||row.querySelector('.rn2')).value; if(!rn){alert('Pick a number');return;}
     const {error}=await sb.from('quaddie_entries').upsert({quaddie_id:q.id,player_id:S.me,leg_index:legIndex,runner_number:Number(rn)},{onConflict:'quaddie_id,player_id,leg_index'});
     if(error){alert(error.message);return;} await loadAll(); render();
@@ -499,14 +507,18 @@ function renderFeature(box){
     <hr><div class="small">Your team (${me.gender==='M'?'👔 Guys':'👗 Girls'}) votes one horse — most votes runs.</div>
     <div class="fb"></div></div>`);
   const fb=card.querySelector('.fb');
-  if(myVote && !(pick&&pick.locked) && isScratched(108,myVote.runner_number)) fb.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ Your vote #${myVote.runner_number} was scratched — vote again.</div>`));
-  if(pick && pick.locked){ fb.appendChild(el(`<div class="ok">Locked in: <b>#${pick.runner_number}</b> runs for the ${me.gender==='M'?'Guys':'Girls'}.</div>`)); }
+  const pickDead = !!(pick && pick.locked && isScratched(108,pick.runner_number));
+  const lockedLive = !!(pick && pick.locked && !pickDead);
+  if(pickDead) fb.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ Your team's horse #${pick.runner_number} was scratched — vote again, then an admin re-locks.</div>`));
+  if(myVote && !lockedLive && isScratched(108,myVote.runner_number)) fb.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ Your vote #${myVote.runner_number} was scratched — vote again.</div>`));
+  if(lockedLive){ fb.appendChild(el(`<div class="ok">Locked in: <b>#${pick.runner_number}</b> runs for the ${me.gender==='M'?'Guys':'Girls'}.</div>`)); }
   const rOpts = runners.length
     ? `<select class="rn"><option value="">Vote a runner…</option>${runners.map(r=>`<option value="${r.number}" ${myVote&&myVote.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
     : `<input class="rn2" type="number" inputmode="numeric" placeholder="Vote runner #" value="${myVote?myVote.runner_number||'':''}">`;
-  if(!(pick&&pick.locked)){
+  if(!lockedLive){
     const row=el(`<div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px"><div>${rOpts}</div><button class="btn sm save">Vote</button></div>`);
     row.querySelector('.save').onclick=async()=>{
+      if(await jumped(race||{id:108})) return;
       const rn=(row.querySelector('.rn')||row.querySelector('.rn2')).value; if(!rn){alert('Pick one');return;}
       const {error}=await sb.from('feature_votes').upsert({player_id:S.me,gender:me.gender,runner_number:Number(rn)},{onConflict:'player_id'});
       if(error){alert(error.message);return;} await loadAll(); render();
@@ -655,6 +667,7 @@ function parseField(text){
     if(m){ num=Number(m[1]); name=m[2]; }
     else if(!anyNum){ num=++auto; name=l; }
     else continue;
+    if(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{2,4}\b/i.test(name)) continue; // "10 Nov 2026"
     const scratched=/\b(scr|scratched)\b/i.test(name);
     name=name.replace(/\b(scr|scratched)\b\.?/ig,' ')
              .split(/\s*\(|\t|\s{2,}|\s+\d{2}(?:\.\d)?\s*kg\b/i)[0]
@@ -699,6 +712,7 @@ function groupBetEditor(g){
 // ---- admin actions ----
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 async function drawPod(){
+  await loadAll(); // the admin phone may have slept and missed live updates
   // 8 nominated races, assign each of 8 boys to one race, each of 8 girls to one race (random)
   if((S.data.pod_assignments||[]).length && !confirm('Already drawn. Re-draw Pick of the Day? Everyone gets a new race, and any POD bets already placed stay on the old race.')) return;
   const noms=(S.data.races||[]).filter(r=>r.pod_nominated).sort((a,b)=>a.sort_order-b.sort_order);
@@ -711,6 +725,7 @@ async function drawPod(){
   msg(error?('Error: '+error.message):'Pick-of-the-Day races drawn ✓'); await loadAll(); render();
 }
 async function drawQuaddieSplits(){
+  await loadAll(); // the admin phone may have slept and missed live updates
   if((S.data.quaddie_groups||[]).length && !confirm('Already drawn. Re-draw the Flem quaddie splits? Picks already entered stay on their old legs.')) return;
   const rows=[];
   for(const q of (S.data.quaddies||[]).filter(q=>q.style==='split')){
@@ -721,6 +736,7 @@ async function drawQuaddieSplits(){
   msg(error?('Error: '+error.message):'Flem quaddie splits drawn ✓'); await loadAll(); render();
 }
 async function lockFeature(){
+  await loadAll(); // the admin phone may have slept and missed live updates
   for(const g of ['M','F']){
     const votes=(S.data.feature_votes||[]).filter(v=>v.gender===g && !isScratched(108,v.runner_number)); // scratched horses can't run
     if(!votes.length) continue;
@@ -809,6 +825,7 @@ function wheelSpin(stage,ctrl,labels){
 }
 async function settleRace(r,winStr,plcStr){
   const win=Number(winStr); if(!win){alert('Enter winner #');return;}
+  await loadAll(); // settle every bet in the DB, including ones this phone never received live
   const places=(plcStr||'').split(',').map(s=>Number(s.trim())).filter(Boolean);
   const {error:re}=await sb.from('races').update({status:'resulted',result_win:win,result_places:places,resulted_at:new Date().toISOString()}).eq('id',r.id);
   if(re){ alert('Could not save result: '+re.message); return; }
