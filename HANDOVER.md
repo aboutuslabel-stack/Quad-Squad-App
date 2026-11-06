@@ -44,7 +44,7 @@ _Last updated: 6 Nov 2026 (night before)_
 3. **Live wheel needs the app open** — phones that are locked or have the app closed miss the animation (they still see the result in Mysteries).
 4. **Push notifications / alerts** — not built.
 5. **No full click-through test** — plumbing verified (site serves, DB reads, code checks), game flows not tested end to end.
-6. **Elly's spelling** and **player photos** still to come.
+6. **Player photos** still to come (Ellie's spelling confirmed).
 
 ## 🕹️ How to run it on the day (Admin = Liam / Blake)
 1. **Before 2:30pm:** Admin tab →
@@ -61,7 +61,7 @@ _Last updated: 6 Nov 2026 (night before)_
 1. **Load runner fields** for all 12 races — biggest.
 2. **Run the draws** (POD + quaddie splits).
 3. **Quick test**: place a bet, settle a race, spin a mystery, watch the board. **There's no in-app reset** — settling marks the race resulted and locks it — so after testing, the test data has to be wiped from the database (ask Claude) before the real day.
-4. Player photos + Elly's spelling.
+4. Player photos.
 
 ## 🛠️ Making changes
 Edit `index.html` (or `supabase/schema.sql` for data) → commit → push to `main` → Railway redeploys in ~1 min. Full game design is in **BRIEF.md**.

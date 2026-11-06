@@ -174,7 +174,7 @@ end $$;
 
 insert into couples (id,label) values
  (1,'Gerard & Amy'),(2,'Liam & Casey'),(3,'Dane & Bec'),(4,'Tim & Jodie'),
- (5,'Glen & Eva'),(6,'Corey & Megan'),(7,'Joel & Casey'),(8,'Blake & Elly')
+ (5,'Glen & Eva'),(6,'Corey & Megan'),(7,'Joel & Casey'),(8,'Blake & Ellie')
 on conflict (id) do nothing;
 
 insert into players (id,first_name,surname,display_name,gender,couple_id,is_admin,is_prez,sort_order) values
@@ -193,7 +193,7 @@ insert into players (id,first_name,surname,display_name,gender,couple_id,is_admi
  (13,'Joel'  ,'Moore'    ,'Joel'        ,'M',7,false,false,13),
  (14,'Casey' ,'Moore'    ,'Casey Moore' ,'F',7,false,false,14),
  (15,'Blake' ,'Lennard'  ,'Blake'       ,'M',8,true ,true ,15),
- (16,'Elly'  ,null       ,'Elly'        ,'F',8,false,false,16)
+ (16,'Ellie' ,null       ,'Ellie'       ,'F',8,false,false,16)
 on conflict (id) do nothing;
 
 -- races (jump times in Melbourne AEDT, +11)

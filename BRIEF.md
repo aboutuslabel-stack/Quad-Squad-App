@@ -18,7 +18,7 @@ Each has a profile + photo. Prez badge on Blake. Two Caseys disambiguated by sur
 | 5 | Glen Tolley | Eva |
 | 6 | Corey Smith | Megan |
 | 7 | Joel Moore | Casey Moore |
-| 8 | Blake Lennard 👑 *(Prez, admin)* | Elly *(confirm spelling)* |
+| 8 | Blake Lennard 👑 *(Prez, admin)* | Ellie |
 
 **Admins (enter results/scratchings):** Liam + Blake.
 
@@ -146,6 +146,6 @@ Real bets go on **Sportsbet** (Liam/Blake place them); app mirrors + tracks each
 ---
 
 ## 7. Open items
-- Elly's spelling
+- ~~Ellie's spelling~~ (confirmed: Ellie)
 - Runner fields (Sportsbet screenshots → load per race)
 - Player photos (Insta)
