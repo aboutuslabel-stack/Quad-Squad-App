@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b3d2e">
+<title>Quad Squad — Steaks Day 2026</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<style>
+  :root{
+    --green:#0b3d2e; --green2:#0f5138; --gold:#e4b84a; --gold2:#f2d488;
+    --ink:#0a0f0d; --paper:#f6f4ec; --mut:#9fb3aa; --line:rgba(255,255,255,.12);
+    --rose:#c9385b; --blue:#2f6fb0; --win:#43b36b; --lose:#c0506a;
+    --bg:#07231a; --card:#0e3326; --card2:#124031;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--paper); -webkit-font-smoothing:antialiased;
+    padding-bottom:84px; min-height:100vh;
+  }
+  a{color:var(--gold)}
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px}
+  h1,h2,h3{margin:.2em 0}
+  .hero{position:relative;height:190px;overflow:hidden;border-bottom:2px solid var(--gold)}
+  .hero img{width:100%;height:100%;object-fit:cover;filter:saturate(1.05)}
+  .hero .ov{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,35,26,.1),rgba(7,35,26,.92))}
+  .hero .ttl{position:absolute;left:0;right:0;bottom:10px;text-align:center}
+  .hero .ttl .k{font-size:12px;letter-spacing:3px;color:var(--gold2);text-transform:uppercase}
+  .hero .ttl .b{font-size:26px;font-weight:800;text-shadow:0 2px 8px #000}
+  .hero .ttl .b em{color:var(--gold);font-style:normal}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:12px 0}
+  .row{display:flex;align-items:center;gap:10px}
+  .spread{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .mut{color:var(--mut)}
+  .pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700}
+  .pill.g{background:rgba(228,184,74,.16);color:var(--gold2)}
+  .pill.blue{background:rgba(47,111,176,.2);color:#bcd7f2}
+  .pill.rose{background:rgba(201,56,91,.2);color:#f3b9c8}
+  .pill.live{background:#b1232f;color:#fff}
+  .pill.lock{background:#333d39;color:#cfe}
+  .pill.done{background:rgba(67,179,107,.2);color:#bdf0cf}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:12px;
+    padding:12px 16px;font-size:15px;font-weight:700;background:var(--gold);color:#201700;cursor:pointer}
+  .btn.sec{background:var(--card2);color:var(--paper);border:1px solid var(--line)}
+  .btn.sm{padding:8px 12px;font-size:13px;border-radius:10px}
+  .btn:disabled{opacity:.45}
+  .grid{display:grid;gap:8px}
+  input,select{background:#09271d;border:1px solid var(--line);color:var(--paper);border-radius:10px;padding:10px;font-size:15px;width:100%}
+  label{font-size:12px;color:var(--mut)}
+  .tabs{display:flex;gap:6px;margin:10px 0}
+  .tab{flex:1;text-align:center;padding:9px;border-radius:10px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--mut)}
+  .tab.on{background:var(--gold);color:#201700;border-color:var(--gold)}
+  .nav{position:fixed;left:0;right:0;bottom:0;background:#061c15;border-top:1px solid var(--line);z-index:30;padding-bottom:env(safe-area-inset-bottom)}
+  .nav .inner{max-width:560px;margin:0 auto;display:flex}
+  .nav a{flex:1;text-align:center;padding:10px 2px 8px;color:var(--mut);font-size:10.5px;text-decoration:none;font-weight:600}
+  .nav a.on{color:var(--gold)}
+  .nav .ic{display:block;font-size:19px;line-height:1}
+  .avatar{width:38px;height:38px;border-radius:50%;background:var(--card2);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--gold2);overflow:hidden;flex:0 0 auto;border:1px solid var(--line)}
+  .avatar img{width:100%;height:100%;object-fit:cover}
+  .lb{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line)}
+  .lb .rk{width:22px;text-align:center;font-weight:800;color:var(--mut)}
+  .lb .pts{font-weight:800}
+  .pos{color:var(--win)} .neg{color:var(--lose)}
+  .vs{display:flex;height:16px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .vs .b{height:100%} .vs .m{background:var(--blue)} .vs .g{background:var(--rose)}
+  .race{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+  .race .tno{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto}
+  .race .flem{background:rgba(47,111,176,.22);color:#bcd7f2}
+  .race .rose{background:rgba(228,184,74,.18);color:var(--gold2)}
+  .overlay{position:fixed;inset:0;background:rgba(3,14,10,.97);z-index:50;display:flex;flex-direction:column}
+  .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:2px solid var(--gold);border-radius:18px 18px 0 0;padding:16px;z-index:60;max-height:86vh;overflow:auto}
+  .sheet .wrap{padding:0}
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%}
+  .namebtn{width:100%;text-align:left;padding:12px 14px;border-radius:12px;background:var(--card);border:1px solid var(--line);color:var(--paper);font-size:16px;font-weight:700;margin:6px 0;display:flex;align-items:center;gap:10px}
+  .namebtn .s{font-size:12px;color:var(--mut);font-weight:500}
+  .small{font-size:12px}
+  .hint{font-size:12px;color:var(--mut);margin:4px 0}
+  .warn{background:rgba(201,56,91,.14);border:1px solid rgba(201,56,91,.4);color:#f3b9c8;border-radius:10px;padding:8px 10px;font-size:12px}
+  .ok{background:rgba(67,179,107,.14);border:1px solid rgba(67,179,107,.4);color:#bdf0cf;border-radius:10px;padding:8px 10px;font-size:12px}
+  .count{font-variant-numeric:tabular-nums;font-weight:800;color:var(--gold2)}
+  hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+  .tagline{font-size:11px;color:var(--mut);text-align:center;margin:6px 0 2px}
+</style>
+</head>
+<body>
+<div id="app"><div class="center" style="min-height:70vh"><div class="mut">Loading Steaks Day…</div></div></div>
+<nav class="nav" id="nav" style="display:none">
+  <div class="inner">
+    <a data-view="home"><span class="ic">🏆</span>Board</a>
+    <a data-view="races"><span class="ic">🐎</span>Races</a>
+    <a data-view="bets"><span class="ic">🎰</span>My Bets</a>
+    <a data-view="games"><span class="ic">🎲</span>Games</a>
+    <a data-view="admin" id="navAdmin" style="display:none"><span class="ic">🛠️</span>Admin</a>
+  </div>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = "https://odpexghueerscbvdkjjy.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Fo8aqLCTsxlDLmmTSfy0iA_v5EaHVk2";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const S = { me:null, view:'home', loaded:false, data:{} };
+const $ = (s,el=document)=>el.querySelector(s);
+const el = (h)=>{const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild;};
+const money = n => (n<0?'-$':'$')+Math.abs(Math.round(n));
+const esc = s => (s==null?'':(''+s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- data ----------
+async function loadAll(){
+  const tables = ['couples','players','races','runners','bets','pod_assignments','quaddies','quaddie_groups','quaddie_entries','feature_votes','feature_picks','group_bets','settings'];
+  const out = {};
+  await Promise.all(tables.map(async t=>{
+    const {data,error} = await sb.from(t).select('*');
+    out[t] = error ? [] : data;
+  }));
+  S.data = out;
+  S.loaded = true;
+}
+function raceById(id){ return (S.data.races||[]).find(r=>r.id===id); }
+function myPlayer(){ return (S.data.players||[]).find(p=>p.id===S.me); }
+function isLocked(r){ if(!r) return true; if(r.status!=='upcoming') return true; return r.jump_time && new Date(r.jump_time) <= new Date(); }
+function melbTime(iso){ try{return new Date(iso).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:'Australia/Melbourne'});}catch(e){return '';} }
+
+// ---------- scoring ----------
+function playerPoints(pid){
+  return (S.data.bets||[]).filter(b=>b.player_id===pid).reduce((a,b)=>a+Number(b.points||0),0);
+}
+function genderPoints(g){
+  const ids = (S.data.players||[]).filter(p=>p.gender===g).map(p=>p.id);
+  const bp = (S.data.bets||[]).filter(b=>ids.includes(b.player_id)).reduce((a,b)=>a+Number(b.points||0),0);
+  const gb = (S.data.group_bets||[]).filter(x=>x.gender_scope===g).reduce((a,b)=>a+Number(b.points||0),0);
+  return bp+gb;
+}
+function couplePoints(cid){
+  const ids = (S.data.players||[]).filter(p=>p.couple_id===cid).map(p=>p.id);
+  return (S.data.bets||[]).filter(b=>ids.includes(b.player_id)).reduce((a,b)=>a+Number(b.points||0),0);
+}
+function groupPnl(){
+  const st = (S.data.settings||[]).find(s=>s.key==='pnl'); const v = st? st.value : {staked:2000,returned:0};
+  return {staked:Number(v.staked||2000), returned:Number(v.returned||0)};
+}
+
+// ---------- render shell ----------
+function render(){
+  if(!S.loaded){ return; }
+  if(!S.me){ renderLogin(); return; }
+  $('#nav').style.display='block';
+  const me = myPlayer();
+  $('#navAdmin').style.display = (me && me.is_admin)?'':'none';
+  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.view===S.view));
+  const app = $('#app');
+  const views = {home:renderHome, races:renderRaces, bets:renderBets, games:renderGames, admin:renderAdmin};
+  app.innerHTML = '';
+  app.appendChild((views[S.view]||renderHome)());
+  window.scrollTo(0,0);
+}
+
+// ---------- login ----------
+function renderLogin(){
+  $('#nav').style.display='none';
+  const app=$('#app');
+  const players=(S.data.players||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
+  const v=el(`<div>
+    <div class="hero"><img src="assets/hero-gates.webp" alt=""><div class="ov"></div>
+      <div class="ttl"><div class="k">The Quad Squad</div><div class="b">STEAKS DAY <em>2026</em></div></div></div>
+    <div class="wrap">
+      <p class="tagline">Flemington × Rosehill · Sat 7 Nov · from 2:30pm</p>
+      <div class="card"><div style="font-weight:800;margin-bottom:6px">Who are you?</div>
+      <div class="hint">Tap your name to jump in — no password.</div>
+      <div id="names"></div></div>
+    </div></div>`);
+  const box=v.querySelector('#names');
+  players.forEach(p=>{
+    const c=(S.data.couples||[]).find(c=>c.id===p.couple_id);
+    const b=el(`<button class="namebtn"><span class="avatar">${initials(p)}</span>
+      <span>${esc(p.display_name)}${p.is_prez?' 👑':''}<span class="s"> · ${esc(c?c.label:'')}</span></span></button>`);
+    b.onclick=()=>confirmLogin(p);
+    box.appendChild(b);
+  });
+  app.innerHTML=''; app.appendChild(v);
+}
+function initials(p){ if(p.photo_url) return `<img src="${esc(p.photo_url)}">`; return esc((p.display_name||'?').slice(0,1).toUpperCase()); }
+function confirmLogin(p){
+  const sheet=el(`<div class="sheet"><div class="center" style="min-height:auto">
+    <div class="avatar" style="width:72px;height:72px;font-size:28px">${initials(p)}</div>
+    <h2 style="margin:12px 0 0">Are you ${esc(p.display_name)}?</h2>
+    <p class="mut small">${p.is_prez?'President of the Quad Squad 👑':''}</p>
+    <div class="row" style="margin-top:14px;width:100%">
+      <button class="btn sec" style="flex:1" id="no">No</button>
+      <button class="btn" style="flex:2" id="yes">Yes, that's me</button></div>
+  </div></div>`);
+  document.body.appendChild(sheet);
+  sheet.querySelector('#no').onclick=()=>sheet.remove();
+  sheet.querySelector('#yes').onclick=()=>{ localStorage.setItem('qs_me',p.id); S.me=p.id; sheet.remove(); S.view='home'; render(); };
+}
+
+// ---------- home / leaderboard ----------
+let lbTab='ind';
+function renderHome(){
+  const pnl=groupPnl(); const net=pnl.returned-pnl.staked;
+  const mp=genderPoints('M'), fp=genderPoints('F');
+  const tot=Math.max(1,Math.abs(mp)+Math.abs(fp));
+  const mPct=Math.max(8,Math.min(92, 50 + (mp-fp)/tot*42 ));
+  const v=el(`<div>
+    <div class="hero"><img src="assets/hero-finish.webp" alt=""><div class="ov"></div>
+      <div class="ttl"><div class="k">The Quad Squad</div><div class="b">STEAKS DAY <em>2026</em></div></div></div>
+    <div class="wrap">
+      <div class="card">
+        <div class="spread"><div><div class="mut small">GROUP P&L · real $ on Sportsbet</div>
+          <div style="font-size:26px;font-weight:800" class="${net>=0?'pos':'neg'}">${net>=0?'+':''}${money(net)}</div></div>
+          <div style="text-align:right"><div class="mut small">Staked</div><div style="font-weight:700">${money(pnl.staked)}</div>
+          <div class="mut small" style="margin-top:4px">Returned</div><div style="font-weight:700">${money(pnl.returned)}</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="spread" style="margin-bottom:8px">
+          <div><span class="pill blue">👔 GUYS</span> <b class="${mp>=0?'pos':'neg'}">${mp>=0?'+':''}${Math.round(mp)}</b></div>
+          <div class="mut small">Battle of the Sexes</div>
+          <div><b class="${fp>=0?'pos':'neg'}">${fp>=0?'+':''}${Math.round(fp)}</b> <span class="pill rose">GIRLS 👗</span></div>
+        </div>
+        <div class="vs"><div class="b m" style="width:${mPct}%"></div><div class="b g" style="width:${100-mPct}%"></div></div>
+      </div>
+      <div class="tabs">
+        <div class="tab ${lbTab==='ind'?'on':''}" data-t="ind">Players</div>
+        <div class="tab ${lbTab==='cup'?'on':''}" data-t="cup">Couples</div>
+        <div class="tab ${lbTab==='gen'?'on':''}" data-t="gen">Guys v Girls</div>
+      </div>
+      <div class="card" id="board"></div>
+    </div></div>`);
+  v.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{lbTab=t.dataset.t;render();});
+  renderBoard(v.querySelector('#board'));
+  return v;
+}
+function renderBoard(box){
+  if(lbTab==='ind'){
+    const rows=(S.data.players||[]).map(p=>({p,pts:playerPoints(p.id)})).sort((a,b)=>b.pts-a.pts);
+    const lowest=rows.length?rows[rows.length-1].p.id:null;
+    box.innerHTML='';
+    rows.forEach((r,i)=>{
+      box.appendChild(el(`<div class="lb"><div class="rk">${i+1}</div>
+        <div class="avatar">${initials(r.p)}</div>
+        <div style="flex:1"><div>${esc(r.p.display_name)}${r.p.is_prez?' 👑':''}${r.p.id===lowest?' <span class="pill lock">🥄 Mug</span>':''}</div>
+        <div class="mut small">${r.p.gender==='M'?'👔':'👗'} ${esc(coupleLabel(r.p.couple_id))}</div></div>
+        <div class="pts ${r.pts>=0?'pos':'neg'}">${r.pts>=0?'+':''}${Math.round(r.pts)}</div></div>`));
+    });
+  } else if(lbTab==='cup'){
+    const rows=(S.data.couples||[]).map(c=>({c,pts:couplePoints(c.id)})).sort((a,b)=>b.pts-a.pts);
+    box.innerHTML='';
+    rows.forEach((r,i)=>box.appendChild(el(`<div class="lb"><div class="rk">${i+1}</div>
+      <div style="flex:1"><b>${esc(r.c.label)}</b></div>
+      <div class="pts ${r.pts>=0?'pos':'neg'}">${r.pts>=0?'+':''}${Math.round(r.pts)}</div></div>`)));
+  } else {
+    const mp=genderPoints('M'), fp=genderPoints('F');
+    box.innerHTML='';
+    [['👔 Guys',mp,'blue'],['👗 Girls',fp,'rose']].sort((a,b)=>b[1]-a[1]).forEach((r,i)=>
+      box.appendChild(el(`<div class="lb"><div class="rk">${i+1}</div>
+        <div style="flex:1;font-size:18px;font-weight:800">${r[0]}</div>
+        <div class="pts ${r[1]>=0?'pos':'neg'}">${r[1]>=0?'+':''}${Math.round(r[1])}</div></div>`)));
+    box.appendChild(el(`<div class="hint" style="margin-top:8px">Includes quaddies, feature (×3), mysteries & get-out-of-jail.</div>`));
+  }
+}
+function coupleLabel(cid){const c=(S.data.couples||[]).find(c=>c.id===cid);return c?c.label:'';}
+
+// ---------- races ----------
+function renderRaces(){
+  const races=(S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
+  const v=el(`<div class="wrap"><h2 style="margin-top:14px">🐎 Race Timeline</h2>
+    <p class="hint">12 races from 2:30pm (Melbourne). Bets lock at the jump.</p><div class="card" id="rl"></div></div>`);
+  const box=v.querySelector('#rl');
+  races.forEach(r=>{
+    const locked=isLocked(r); const resulted=r.status==='resulted';
+    const runnersN=(S.data.runners||[]).filter(x=>x.race_id===r.id).length;
+    let st = resulted?`<span class="pill done">RESULT ${r.result_win?('#'+r.result_win):''}</span>`
+             : locked?`<span class="pill lock">LOCKED</span>`
+             : `<span class="count" data-jt="${r.jump_time}">—</span>`;
+    box.appendChild(el(`<div class="race"><div class="tno ${r.track==='Flemington'?'flem':'rose'}">R${r.race_no}</div>
+      <div style="flex:1"><div style="font-weight:700">${esc(r.name)}${r.id===108?' 🥩':''}</div>
+        <div class="mut small">${esc(r.track)} · ${esc(r.distance||'')} ${r.grade?('· '+esc(r.grade)):''} · ${melbTime(r.jump_time)}${runnersN?` · ${runnersN} runners`:' · fields TBD'}</div></div>
+      <div style="text-align:right">${st}</div></div>`));
+  });
+  return v;
+}
+function tickCountdowns(){
+  document.querySelectorAll('.count[data-jt]').forEach(c=>{
+    const t=new Date(c.dataset.jt)-new Date();
+    if(t<=0){c.textContent='JUMP';return;}
+    const m=Math.floor(t/60000), s=Math.floor(t%60000/1000);
+    const h=Math.floor(m/60);
+    c.textContent = h>0?`${h}h ${m%60}m`:`${m}:${String(s).padStart(2,'0')}`;
+  });
+}
+setInterval(tickCountdowns,1000);
+
+// ---------- my bets ----------
+function myPodRace(){ const a=(S.data.pod_assignments||[]).find(x=>x.player_id===S.me); return a?raceById(a.race_id):null; }
+function myQuaddieLegRaces(){
+  const out=new Set();
+  (S.data.quaddie_groups||[]).filter(g=>g.player_id===S.me).forEach(g=>{
+    const q=(S.data.quaddies||[]).find(q=>q.id===g.quaddie_id); if(!q) return;
+    const legs=q.leg_race_ids||[];
+    if(q.style==='split'){ (g.grp==='first'?[legs[0],legs[1]]:[legs[2],legs[3]]).forEach(id=>out.add(id)); }
+  });
+  return out;
+}
+function myBet(raceId,type){ return (S.data.bets||[]).find(b=>b.player_id===S.me&&b.race_id===raceId&&b.bet_type===type); }
+function renderBets(){
+  const me=myPlayer();
+  const pod=myPodRace();
+  const myInd=(S.data.bets||[]).filter(b=>b.player_id===S.me&&b.bet_type==='individual');
+  const v=el(`<div class="wrap"><h2 style="margin-top:14px">🎰 My Bets</h2>
+    <p class="hint">5 bets @ $10 (your picks) + 1 Pick of the Day @ $25. Enter the odds you take on Sportsbet.</p>
+    <div class="card"><div class="spread"><b>Pick of the Day ·  $25 · ×2 pts</b><span class="pill g">DOUBLE</span></div>
+      <div id="podbox"></div></div>
+    <div class="spread" style="margin:10px 2px"><b>Your 5 bets</b><span class="mut small">${myInd.length}/5 placed</span></div>
+    <div id="indbox"></div>
+    </div>`);
+  // POD
+  const podbox=v.querySelector('#podbox');
+  if(!pod){ podbox.appendChild(el(`<div class="hint">Your Pick-of-the-Day race hasn't been drawn yet — the admin runs the draw before 2:30.</div>`)); }
+  else { podbox.appendChild(betEditor(pod,'pick_of_day',25)); }
+  // individual
+  const indbox=v.querySelector('#indbox');
+  const excl=myQuaddieLegRaces(); if(pod) excl.add(pod.race_id);
+  const races=(S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
+  races.forEach(r=>{
+    const mine=myBet(r.id,'individual');
+    const blocked=excl.has(r.id);
+    if(blocked && !mine){ return; } // hide no-double-dip races
+    indbox.appendChild(betEditor(r,'individual',10, blocked));
+  });
+  return v;
+}
+function betEditor(race,type,stake,blocked){
+  const mine=myBet(race.id,type);
+  const locked=isLocked(race);
+  const runners=(S.data.runners||[]).filter(x=>x.race_id===race.id && !x.scratched).sort((a,b)=>a.number-b.number);
+  const box=el(`<div class="card"><div class="spread">
+      <div><b>${esc(race.name)}</b> <span class="pill ${race.track==='Flemington'?'blue':'g'}">R${race.race_no} ${race.track.slice(0,4)}</span>
+      <div class="mut small">${melbTime(race.jump_time)} · $${stake}${type==='pick_of_day'?' · your assigned race':''}</div></div>
+      <div>${locked?'<span class="pill lock">LOCKED</span>':''}</div></div>`);
+  if(blocked){ box.appendChild(el(`<div class="hint">You're repping the group here — no double-dipping.</div>`)); return box; }
+  if(locked){
+    box.appendChild(el(`<div class="small">${mine?`Your pick: #${mine.runner_number} ${esc(mine.horse_name||'')} @ ${mine.odds||'?'} — <b class="${mine.points>=0?'pos':'neg'}">${mine.status.toUpperCase()}${mine.points?` ${mine.points>=0?'+':''}${Math.round(mine.points)}`:''}</b>`:'<span class="mut">No bet placed.</span>'}</div>`));
+    return box;
+  }
+  const rOpts = runners.length
+    ? `<select class="rn"><option value="">Pick a runner…</option>${runners.map(r=>`<option value="${r.number}" ${mine&&mine.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
+    : `<input class="rn2" type="number" inputmode="numeric" placeholder="Runner # (fields TBD)" value="${mine?mine.runner_number||'':''}">`;
+  const ed=el(`<div class="grid" style="grid-template-columns:1fr 90px auto;align-items:end;margin-top:8px">
+    <div><label>Runner</label>${rOpts}</div>
+    <div><label>Odds</label><input class="od" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 4.5" value="${mine?mine.odds||'':''}"></div>
+    <button class="btn sm save">${mine?'Update':'Place'}</button></div>`);
+  box.appendChild(ed);
+  ed.querySelector('.save').onclick=async()=>{
+    const rn = (ed.querySelector('.rn')||ed.querySelector('.rn2')).value;
+    const od = ed.querySelector('.od').value;
+    if(!rn){ alert('Pick a runner'); return; }
+    const runnerObj=runners.find(r=>r.number==rn);
+    const rec={ player_id:S.me, race_id:race.id, bet_type:type, runner_number:Number(rn),
+      horse_name:runnerObj?runnerObj.horse_name:null, stake:stake, odds:od?Number(od):null, status:'open' };
+    const {error}=await sb.from('bets').upsert(rec,{onConflict:'player_id,race_id,bet_type'});
+    if(error){ alert('Error: '+error.message); return; }
+    await loadAll(); render();
+  };
+  return box;
+}
+
+// ---------- games ----------
+let gameTab='quaddies';
+function renderGames(){
+  const v=el(`<div class="wrap"><h2 style="margin-top:14px">🎲 Games</h2>
+    <div class="tabs">
+      <div class="tab ${gameTab==='quaddies'?'on':''}" data-t="quaddies">Quaddies</div>
+      <div class="tab ${gameTab==='feature'?'on':''}" data-t="feature">🥩 Feature</div>
+      <div class="tab ${gameTab==='myst'?'on':''}" data-t="myst">🎡 Mysteries</div>
+    </div><div id="gbody"></div></div>`);
+  v.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{gameTab=t.dataset.t;render();});
+  const body=v.querySelector('#gbody');
+  if(gameTab==='quaddies') renderQuaddies(body);
+  else if(gameTab==='feature') renderFeature(body);
+  else renderMysteries(body);
+  return v;
+}
+function renderQuaddies(box){
+  const me=myPlayer();
+  (S.data.quaddies||[]).forEach(q=>{
+    const legs=(q.leg_race_ids||[]).map(raceById);
+    const card=el(`<div class="card"><div class="spread"><b>${esc(q.name)}</b><span class="pill g">$${q.stake}</span></div>
+      <div class="mut small">${legs.map(r=>r?`R${r.race_no}`:'').join(' · ')} · ${q.style==='split'?'random people split across legs':'everyone enters a number each leg'}</div><div class="qb"></div></div>`);
+    const qb=card.querySelector('.qb');
+    const inScope = q.gender_scope==='ALL' || q.gender_scope===me.gender;
+    if(q.style==='split'){
+      const grp=(S.data.quaddie_groups||[]).find(g=>g.quaddie_id===q.id&&g.player_id===S.me);
+      if(!inScope){ qb.appendChild(el(`<div class="hint">${q.gender_scope==='M'?'Boys':'Girls'} only.</div>`)); }
+      else if(!grp){ qb.appendChild(el(`<div class="hint">Waiting on the random draw — admin runs it. You'll get 2 of the 4 legs.</div>`)); }
+      else {
+        const myLegs = grp.grp==='first'?[0,1]:[2,3];
+        qb.appendChild(el(`<div class="ok small">You're in: <b>${grp.grp==='first'?'first 2 legs':'last 2 legs'}</b> — pick a horse in each.</div>`));
+        myLegs.forEach(i=>qb.appendChild(quaddieLeg(q,legs[i],i+1)));
+      }
+    } else {
+      if(!inScope){ qb.appendChild(el(`<div class="hint">Everyone's in this one.</div>`)); }
+      legs.forEach((r,i)=>qb.appendChild(quaddieLeg(q,r,i+1)));
+    }
+    box.appendChild(card);
+  });
+}
+function quaddieLeg(q,race,legIndex){
+  if(!race) return el('<div></div>');
+  const mine=(S.data.quaddie_entries||[]).find(e=>e.quaddie_id===q.id&&e.player_id===S.me&&e.leg_index===legIndex);
+  const runners=(S.data.runners||[]).filter(x=>x.race_id===race.id&&!x.scratched).sort((a,b)=>a.number-b.number);
+  const locked=isLocked(race);
+  const rOpts = runners.length
+    ? `<select class="rn"><option value="">#…</option>${runners.map(r=>`<option value="${r.number}" ${mine&&mine.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
+    : `<input class="rn2" type="number" inputmode="numeric" placeholder="Runner #" value="${mine?mine.runner_number||'':''}">`;
+  const row=el(`<div class="grid" style="grid-template-columns:70px 1fr auto;align-items:end;margin-top:8px">
+    <div><label>Leg ${legIndex}</label><div class="small" style="font-weight:700">R${race.race_no}</div></div>
+    <div>${rOpts}</div>
+    <button class="btn sm save" ${locked?'disabled':''}>${mine?'✓':'Save'}</button></div>`);
+  if(!locked) row.querySelector('.save').onclick=async()=>{
+    const rn=(row.querySelector('.rn')||row.querySelector('.rn2')).value; if(!rn){alert('Pick a number');return;}
+    const {error}=await sb.from('quaddie_entries').upsert({quaddie_id:q.id,player_id:S.me,leg_index:legIndex,runner_number:Number(rn)},{onConflict:'quaddie_id,player_id,leg_index'});
+    if(error){alert(error.message);return;} await loadAll(); render();
+  };
+  return row;
+}
+function renderFeature(box){
+  const me=myPlayer();
+  const race=raceById(108);
+  const myVote=(S.data.feature_votes||[]).find(v=>v.player_id===S.me);
+  const pick=(S.data.feature_picks||[]).find(p=>p.gender===me.gender);
+  const runners=(S.data.runners||[]).filter(x=>x.race_id===108&&!x.scratched).sort((a,b)=>a.number-b.number);
+  const card=el(`<div class="card">
+    <div class="spread"><b>🥩 Steaks Day Feature</b><span class="pill g">×3 pts</span></div>
+    <div class="mut small">${esc(race?race.name:'Champions Stakes')} · R8 Flemington · 5:10pm · $100 e/w per team · 🥂 glasses up</div>
+    <hr><div class="small">Your team (${me.gender==='M'?'👔 Guys':'👗 Girls'}) votes one horse — most votes runs.</div>
+    <div class="fb"></div></div>`);
+  const fb=card.querySelector('.fb');
+  if(pick && pick.locked){ fb.appendChild(el(`<div class="ok">Locked in: <b>#${pick.runner_number}</b> runs for the ${me.gender==='M'?'Guys':'Girls'}.</div>`)); }
+  const rOpts = runners.length
+    ? `<select class="rn"><option value="">Vote a runner…</option>${runners.map(r=>`<option value="${r.number}" ${myVote&&myVote.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
+    : `<input class="rn2" type="number" inputmode="numeric" placeholder="Vote runner #" value="${myVote?myVote.runner_number||'':''}">`;
+  if(!(pick&&pick.locked)){
+    const row=el(`<div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px"><div>${rOpts}</div><button class="btn sm save">Vote</button></div>`);
+    row.querySelector('.save').onclick=async()=>{
+      const rn=(row.querySelector('.rn')||row.querySelector('.rn2')).value; if(!rn){alert('Pick one');return;}
+      const {error}=await sb.from('feature_votes').upsert({player_id:S.me,gender:me.gender,runner_number:Number(rn)},{onConflict:'player_id'});
+      if(error){alert(error.message);return;} await loadAll(); render();
+    };
+    fb.appendChild(row);
+  }
+  // tally
+  const votes=(S.data.feature_votes||[]).filter(v=>v.gender===me.gender);
+  const tally={}; votes.forEach(v=>tally[v.runner_number]=(tally[v.runner_number]||0)+1);
+  const trows=Object.entries(tally).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="spread small"><span>#${n}</span><span class="mut">${c} vote${c>1?'s':''}</span></div>`).join('');
+  if(trows) fb.appendChild(el(`<hr><div class="mut small">Your team's votes</div>${trows}`));
+  box.appendChild(card);
+}
+function renderMysteries(box){
+  box.appendChild(el(`<p class="hint">The wheel: spin 1 = random race, spin 2 = random horse. Admin spins each one live.</p>`));
+  (S.data.group_bets||[]).filter(g=>g.category==='mystery').forEach(m=>{
+    const r=m.race_id?raceById(m.race_id):null;
+    box.appendChild(el(`<div class="card"><div class="spread"><b>🎡 ${esc(m.label)}</b><span class="pill ${m.gender_scope==='M'?'blue':'rose'}">$${m.stake}</span></div>
+      <div class="small" style="margin-top:6px">${r?`<b>R${r.race_no} ${esc(r.name)}</b> → <b>#${m.runner_number||'?'}</b> ${m.status!=='open'?`· <span class="pill done">${m.status.toUpperCase()}</span>`:''}`:'<span class="mut">Not spun yet 🎡</span>'}</div></div>`));
+  });
+  // get out of jail
+  box.appendChild(el(`<h3 style="margin-top:14px">🆓 Get Out of Jail</h3>`));
+  (S.data.group_bets||[]).filter(g=>g.category==='getout').forEach(g=>{
+    const r=raceById(g.race_id);
+    box.appendChild(el(`<div class="card"><div class="spread"><b>${esc(g.label)}</b><span class="pill ${g.gender_scope==='M'?'blue':'rose'}">$${g.stake}</span></div>
+      <div class="mut small">${r?`R${r.race_no} ${esc(r.track)} · ${melbTime(r.jump_time)}`:''} · last-race redemption</div></div>`));
+  });
+}
+
+// ---------- admin ----------
+function renderAdmin(){
+  const v=el(`<div class="wrap"><h2 style="margin-top:14px">🛠️ Admin <span class="mut small">(${esc(myPlayer().display_name)})</span></h2>
+    <div class="card"><b>Draws & setup</b>
+      <div class="grid" style="margin-top:8px">
+        <button class="btn sec" id="drawPod">🎯 Draw Pick-of-the-Day races</button>
+        <button class="btn sec" id="drawQ">🐎 Draw Flem quaddie splits</button>
+        <button class="btn sec" id="lockFeat">🥩 Lock feature votes (most-voted runs)</button>
+      </div><div class="hint" id="aMsg"></div></div>
+    <div class="card"><b>Spin a Mystery 🎡</b><div class="grid" id="spinBox" style="margin-top:8px"></div></div>
+    <div class="card"><b>Group P&L</b>
+      <div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px">
+        <div><label>Total returned from Sportsbet ($)</label><input id="pnlIn" type="number" value="${groupPnl().returned}"></div>
+        <button class="btn sm" id="pnlSave">Save</button></div></div>
+    <h3 style="margin-top:14px">Results & scratchings</h3>
+    <div id="adminRaces"></div>
+  </div>`);
+  v.querySelector('#drawPod').onclick=drawPod;
+  v.querySelector('#drawQ').onclick=drawQuaddieSplits;
+  v.querySelector('#lockFeat').onclick=lockFeature;
+  v.querySelector('#pnlSave').onclick=async()=>{
+    const val=Number(v.querySelector('#pnlIn').value||0);
+    await sb.from('settings').upsert({key:'pnl',value:{staked:2000,returned:val}},{onConflict:'key'});
+    await loadAll(); render();
+  };
+  // spin buttons
+  const sb_=v.querySelector('#spinBox');
+  (S.data.group_bets||[]).filter(g=>g.category==='mystery').forEach(m=>{
+    const b=el(`<button class="btn sec sm">🎡 Spin ${esc(m.label)}${m.race_id?' (re-spin)':''}</button>`);
+    b.onclick=()=>spinMystery(m); sb_.appendChild(b);
+  });
+  // races admin
+  const box=v.querySelector('#adminRaces');
+  (S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order).forEach(r=>box.appendChild(adminRace(r)));
+  return v;
+}
+function adminRace(r){
+  const resulted=r.status==='resulted';
+  const card=el(`<div class="card"><div class="spread"><div><b>R${r.race_no} ${esc(r.track.slice(0,4))}</b> ${esc(r.name)}
+     ${resulted?`<span class="pill done">WIN #${r.result_win}</span>`:''}</div>
+     <div class="mut small">${melbTime(r.jump_time)}</div></div>
+    <div class="grid" style="grid-template-columns:1fr 1fr auto;align-items:end;margin-top:8px">
+      <div><label>Winner #</label><input class="win" type="number" inputmode="numeric" value="${r.result_win||''}"></div>
+      <div><label>Placed #s (2nd,3rd)</label><input class="plc" placeholder="e.g. 5,2" value="${(r.result_places||[]).join(',')}"></div>
+      <button class="btn sm settle">${resulted?'Re-settle':'Settle'}</button></div>
+    <div class="hint">Enter result → settles all bets on this race. Scratch runners in fields later.</div></div>`);
+  card.querySelector('.settle').onclick=()=>settleRace(r,card.querySelector('.win').value,card.querySelector('.plc').value);
+  return card;
+}
+
+// ---- admin actions ----
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+async function drawPod(){
+  // 8 nominated races, assign each of 8 boys to one race, each of 8 girls to one race (random)
+  const noms=(S.data.races||[]).filter(r=>r.pod_nominated).sort((a,b)=>a.sort_order-b.sort_order);
+  const boys=shuffle((S.data.players||[]).filter(p=>p.gender==='M'));
+  const girls=shuffle((S.data.players||[]).filter(p=>p.gender==='F'));
+  const rows=[];
+  boys.forEach((p,i)=>rows.push({player_id:p.id,race_id:noms[i%noms.length].id}));
+  girls.forEach((p,i)=>rows.push({player_id:p.id,race_id:noms[i%noms.length].id}));
+  const {error}=await sb.from('pod_assignments').upsert(rows,{onConflict:'player_id'});
+  msg(error?('Error: '+error.message):'Pick-of-the-Day races drawn ✓'); await loadAll(); render();
+}
+async function drawQuaddieSplits(){
+  const rows=[];
+  for(const q of (S.data.quaddies||[]).filter(q=>q.style==='split')){
+    const pool=shuffle((S.data.players||[]).filter(p=>p.gender===q.gender_scope));
+    pool.forEach((p,i)=>rows.push({quaddie_id:q.id,player_id:p.id,grp:i<pool.length/2?'first':'last'}));
+  }
+  const {error}=await sb.from('quaddie_groups').upsert(rows,{onConflict:'quaddie_id,player_id'});
+  msg(error?('Error: '+error.message):'Flem quaddie splits drawn ✓'); await loadAll(); render();
+}
+async function lockFeature(){
+  for(const g of ['M','F']){
+    const votes=(S.data.feature_votes||[]).filter(v=>v.gender===g);
+    if(!votes.length) continue;
+    const tally={}; votes.forEach(v=>tally[v.runner_number]=(tally[v.runner_number]||0)+1);
+    const win=Object.entries(tally).sort((a,b)=>b[1]-a[1])[0][0];
+    await sb.from('feature_picks').upsert({gender:g,runner_number:Number(win),locked:true},{onConflict:'gender'});
+  }
+  msg('Feature picks locked ✓'); await loadAll(); render();
+}
+async function spinMystery(m){
+  const pool=(S.data.races||[]).filter(r=>r.track===m.track);
+  const race=pool[Math.floor(Math.random()*pool.length)];
+  const runners=(S.data.runners||[]).filter(x=>x.race_id===race.id&&!x.scratched);
+  const rn = runners.length?runners[Math.floor(Math.random()*runners.length)].number:(Math.floor(Math.random()*12)+1);
+  await sb.from('group_bets').update({race_id:race.id,runner_number:rn}).eq('id',m.id);
+  msg(`🎡 ${m.label}: R${race.race_no} ${race.name} → #${rn}`); await loadAll(); render();
+}
+async function settleRace(r,winStr,plcStr){
+  const win=Number(winStr); if(!win){alert('Enter winner #');return;}
+  const places=(plcStr||'').split(',').map(s=>Number(s.trim())).filter(Boolean);
+  await sb.from('races').update({status:'resulted',result_win:win,result_places:places,resulted_at:new Date().toISOString()}).eq('id',r.id);
+  // settle individual + pod bets on this race
+  const bets=(S.data.bets||[]).filter(b=>b.race_id===r.id);
+  for(const b of bets){
+    const mult = b.bet_type==='pick_of_day'?2:1;
+    let status='lost', payout=0, pts=0;
+    if(b.runner_number===win){ status='won'; payout=Number(b.stake)*Number(b.odds||0); pts=(payout-b.stake)*mult; }
+    else { pts = (0-Number(b.stake))*mult; }
+    await sb.from('bets').update({status,payout,points:pts}).eq('id',b.id);
+  }
+  // settle group bets on this race (feature ×3, getout/mystery ×1) — win-based, place credited for e/w
+  const gbs=(S.data.group_bets||[]).filter(g=>g.race_id===r.id);
+  for(const g of gbs){
+    const mult = g.category==='feature'?3:1;
+    const rn = g.category==='feature' ? (S.data.feature_picks||[]).find(p=>p.gender===g.gender_scope)?.runner_number : g.runner_number;
+    let status='lost', pts=0;
+    const won = rn===win, placed = won || places.includes(rn);
+    if(g.bet_mode==='ew'){
+      // $50 win + $50 place; approximate payout using entered odds (win odds); place pays ~1/4 odds
+      const half=Number(g.stake)/2; const od=Number(g.odds||0);
+      let pay=0; if(won) pay+=half*od; if(placed) pay+=half*(1+(od-1)/4);
+      status = won?'won':(placed?'placed':'lost'); pts=(pay-Number(g.stake))*mult;
+    } else {
+      if(won){ status='won'; pts=(Number(g.stake)*Number(g.odds||0)-g.stake)*mult; }
+      else { pts=(0-Number(g.stake))*mult; }
+    }
+    await sb.from('group_bets').update({status,points:pts}).eq('id',g.id);
+  }
+  msg(`R${r.race_no} settled on #${win} ✓`); await loadAll(); render();
+}
+function msg(t){ const m=document.querySelector('#aMsg'); if(m) m.textContent=t; }
+
+// ---------- boot ----------
+document.querySelectorAll('.nav a').forEach(a=>a.onclick=()=>{S.view=a.dataset.view;render();});
+async function boot(){
+  await loadAll();
+  const saved=localStorage.getItem('qs_me');
+  if(saved && (S.data.players||[]).some(p=>p.id===Number(saved))) S.me=Number(saved);
+  render();
+  // realtime: any change reloads
+  sb.channel('qs').on('postgres_changes',{event:'*',schema:'public'},async()=>{ await loadAll(); render(); }).subscribe();
+}
+boot().catch(e=>{ $('#app').innerHTML=`<div class="wrap"><div class="card warn">Load error: ${esc(e.message)}<br><br>If this is the first run, the database tables may not be applied yet.</div></div>`; });
+</script>
+</body>
+</html>
