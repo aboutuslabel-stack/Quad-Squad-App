@@ -148,8 +148,10 @@ function isLocked(r){ if(!r) return true; if(r.status!=='upcoming') return true;
 function melbTime(iso){ try{return new Date(iso).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:'Australia/Melbourne'});}catch(e){return '';} }
 
 // ---------- scoring ----------
+// Personal boards (Players, Couples, Mug) = your 5 bets + Pick of the Day. Group picks only count for Guys v Girls.
+const PERSONAL=b=>b.bet_type!=='group_pick';
 function playerPoints(pid){
-  return (S.data.bets||[]).filter(b=>b.player_id===pid).reduce((a,b)=>a+Number(b.points||0),0);
+  return (S.data.bets||[]).filter(b=>b.player_id===pid&&PERSONAL(b)).reduce((a,b)=>a+Number(b.points||0),0);
 }
 function genderPoints(g){
   const ids = (S.data.players||[]).filter(p=>p.gender===g).map(p=>p.id);
@@ -183,7 +185,7 @@ function quaddieLanded(q){
 function anyResulted(){ return (S.data.races||[]).some(r=>r.status==='resulted'); }
 function couplePoints(cid){
   const ids = (S.data.players||[]).filter(p=>p.couple_id===cid).map(p=>p.id);
-  return (S.data.bets||[]).filter(b=>ids.includes(b.player_id)).reduce((a,b)=>a+Number(b.points||0),0);
+  return (S.data.bets||[]).filter(b=>ids.includes(b.player_id)&&PERSONAL(b)).reduce((a,b)=>a+Number(b.points||0),0);
 }
 function groupPnl(){
   const st = (S.data.settings||[]).find(s=>s.key==='pnl'); const v = st? st.value : {staked:2000,returned:0};
@@ -325,7 +327,7 @@ function renderBoard(box){
 function coupleLabel(cid){const c=(S.data.couples||[]).find(c=>c.id===cid);return c?c.label:'';}
 
 // ---------- races ----------
-// Who is repping this race: Pick-of-the-Day pair, quaddie legs, feature, get-out and any mystery that landed here.
+// Who is repping this race: group-pick pair, quaddie legs, feature, get-out and any mystery that landed here.
 function raceReps(r){
   const P=id=>(S.data.players||[]).find(p=>p.id===id);
   const nm=p=>p?`<span class="${p.id===S.me?'me':''}">${esc(p.id===S.me?'You':p.display_name)}</span>`:'?';
@@ -333,7 +335,7 @@ function raceReps(r){
   const pod=(S.data.pod_assignments||[]).filter(a=>a.race_id===r.id).map(a=>P(a.player_id)).filter(Boolean);
   if(pod.length){
     const m=pod.filter(p=>p.gender==='M'), f=pod.filter(p=>p.gender==='F');
-    out.push(`🎯 Pick of the Day: 👔 ${m.map(nm).join(', ')||'—'} <span class="mut">v</span> 👗 ${f.map(nm).join(', ')||'—'}`);
+    out.push(`👥 Group pick: 👔 ${m.map(nm).join(', ')||'—'} <span class="mut">v</span> 👗 ${f.map(nm).join(', ')||'—'}`);
   }
   (S.data.quaddies||[]).forEach(q=>{
     const li=(q.leg_race_ids||[]).indexOf(r.id); if(li<0) return;
@@ -403,30 +405,48 @@ async function jumped(race){
   return false;
 }
 function myBet(raceId,type){ return (S.data.bets||[]).find(b=>b.player_id===S.me&&b.race_id===raceId&&b.bet_type===type); }
+let podPick=null; // race chosen in the Pick-of-the-Day race picker (before a bet exists)
 function renderBets(){
   const me=myPlayer();
-  const pod=myPodRace();
+  const grp=myPodRace();                       // drawn group-pick race
   const myInd=(S.data.bets||[]).filter(b=>b.player_id===S.me&&b.bet_type==='individual');
+  const myPod=(S.data.bets||[]).find(b=>b.player_id===S.me&&b.bet_type==='pick_of_day');
+  const team=me&&me.gender==='M'?'👔 Guys':'👗 Girls';
   const v=el(`<div class="wrap"><h2 style="margin-top:14px">🎰 My Bets</h2>
-    <p class="hint">5 bets @ $10 (your picks) + 1 Pick of the Day @ $25. Enter the odds you take on Sportsbet.</p>
-    <div class="card"><div class="spread"><b>Pick of the Day ·  $25 · ×2 pts</b><span class="pill g">DOUBLE</span></div>
+    <p class="hint">Your group pick for the ${team} ($25) · your own Pick of the Day ($25, double points) · 5 bets @ $10. Enter the odds you take on Sportsbet.</p>
+    <div class="card"><div class="spread"><b>👥 Group pick · $25 · for the ${team}</b><span class="pill ${me&&me.gender==='M'?'blue':'rose'}">TEAM</span></div>
+      <div class="hint">Your drawn race: pick one horse for your team. It's 👔 v 👗 in every race, and it counts on the Guys v Girls board.</div>
+      <div id="grpbox"></div></div>
+    <div class="card"><div class="spread"><b>🎯 Pick of the Day · $25 · ×2 pts</b><span class="pill g">DOUBLE</span></div>
+      <div class="hint">Your best bet of the day: any race, any horse. A bit more on it, and double points on your own board.</div>
       <div id="podbox"></div></div>
     <div class="spread" style="margin:10px 2px"><b>Your 5 bets</b><span class="mut small">${myInd.length}/5 placed</span></div>
     <div id="indbox"></div>
     </div>`);
-  // POD
-  const podbox=v.querySelector('#podbox');
-  if(!pod){ podbox.appendChild(el(`<div class="hint">Your Pick-of-the-Day race hasn't been drawn yet — the admin runs the draw before 2:30.</div>`)); }
-  else { podbox.appendChild(betEditor(pod,'pick_of_day',25)); }
-  // individual
-  const indbox=v.querySelector('#indbox');
-  const excl=myQuaddieLegRaces(); if(pod) excl.add(pod.id);
   const races=(S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
+  const rep=myQuaddieLegRaces(); if(grp) rep.add(grp.id);   // races you're repping the group in
+  // group pick
+  const grpbox=v.querySelector('#grpbox');
+  if(!grp) grpbox.appendChild(el(`<div class="hint">Not drawn yet. The admin runs the draw before 2:30.</div>`));
+  else grpbox.appendChild(betEditor(grp,'group_pick',25));
+  // pick of the day: choose the race, then the horse
+  const podbox=v.querySelector('#podbox');
+  const podRace = podPick ? raceById(podPick) : (myPod ? raceById(myPod.race_id) : null);  // the race you just chose wins
+  const podOk=r=>!rep.has(r.id) && !isLocked(r) && !myInd.some(b=>b.race_id===r.id);
+  if(!(myPod && isLocked(raceById(myPod.race_id)))){
+    const opts=races.filter(r=>podOk(r)||(podRace&&r.id===podRace.id));
+    const sel=el(`<div style="margin-top:8px"><label>Race</label><select class="podrace"><option value="">Choose your race…</option>${opts.map(r=>`<option value="${r.id}" ${podRace&&podRace.id===r.id?'selected':''}>${melbTime(r.jump_time)} · R${r.race_no} ${esc(r.track.slice(0,4))} · ${esc(r.name)}</option>`).join('')}</select></div>`);
+    sel.querySelector('select').onchange=e=>{ podPick=Number(e.target.value)||null; S.dirty=false; render(); };
+    podbox.appendChild(sel);
+  }
+  if(podRace) podbox.appendChild(betEditor(podRace,'pick_of_day',25));
+  // 5 individual bets
+  const indbox=v.querySelector('#indbox');
   races.forEach(r=>{
     const mine=myBet(r.id,'individual');
-    const blocked=excl.has(r.id);
-    if(blocked && !mine){ return; } // hide no-double-dip races
-    indbox.appendChild(betEditor(r,'individual',10, blocked));
+    if(rep.has(r.id) && !mine) return;                        // no double-dipping: hidden
+    if(!mine && ((podRace && r.id===podRace.id) || (myPod && r.id===myPod.race_id))) return;   // that's your Pick of the Day race
+    indbox.appendChild(betEditor(r,'individual',10, rep.has(r.id)));
   });
   return v;
 }
@@ -436,7 +456,7 @@ function betEditor(race,type,stake,blocked){
   const runners=(S.data.runners||[]).filter(x=>x.race_id===race.id && !x.scratched).sort((a,b)=>a.number-b.number);
   const box=el(`<div class="card"><div class="spread">
       <div><b>${esc(race.name)}</b> <span class="pill ${race.track==='Flemington'?'blue':'g'}">R${race.race_no} ${race.track.slice(0,4)}</span>
-      <div class="mut small">${melbTime(race.jump_time)} · $${stake}${type==='pick_of_day'?' · your assigned race':''}</div></div>
+      <div class="mut small">${melbTime(race.jump_time)} · $${stake}${type==='group_pick'?' · your drawn race':type==='pick_of_day'?' · your Pick of the Day':''}</div></div>
       <div>${locked?'<span class="pill lock">LOCKED</span>':''}</div></div>`);
   if(blocked){ box.appendChild(el(`<div class="hint">You're repping the group here — no double-dipping.</div>`)); return box; }
   if(mine && !locked && isScratched(race.id,mine.runner_number)) box.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ #${mine.runner_number} ${esc(mine.horse_name||'')} was scratched — pick again (it refunds if you leave it).</div>`));
@@ -465,6 +485,7 @@ function betEditor(race,type,stake,blocked){
       horse_name:runnerObj?runnerObj.horse_name:null, stake:stake, odds:Number(od), status:'open' };
     const {error}=await sb.from('bets').upsert(rec,{onConflict:'player_id,race_id,bet_type'});
     if(error){ alert('Error: '+error.message); return; }
+    if(type==='pick_of_day'){ await sb.from('bets').delete().eq('player_id',S.me).eq('bet_type','pick_of_day').neq('race_id',race.id); podPick=null; }
     await loadAll(); render();
   };
   return box;
@@ -484,7 +505,8 @@ function renderRules(){
 
     <div class="card"><h3>⚡ Your day, ${esc(me.display_name||'')}</h3>
       <ul>
-        <li><b>Pick of the Day:</b> ${pod?`<b>R${pod.race_no} ${esc(pod.track)} ${esc(pod.name)}</b>, ${melbTime(pod.jump_time)}`:'not drawn yet'}. $25, double points.</li>
+        <li><b>Your group pick:</b> ${pod?`<b>R${pod.race_no} ${esc(pod.track)} ${esc(pod.name)}</b>, ${melbTime(pod.jump_time)}`:'not drawn yet'}. Pick one horse for your team ($25).</li>
+        <li><b>Pick of the Day:</b> your own best bet, any race. $25, double points.</li>
         ${myQ?`<li><b>Your Flem quaddie legs:</b> ${myQ}</li>`:''}
         <li><b>Rosehill quaddie:</b> everyone picks one horse in each of R7–R10.</li>
         <li><b>Feature (Champions Stakes, 5:10pm):</b> vote your team's horse in Games → Feature.</li>
@@ -495,30 +517,31 @@ function renderRules(){
         <li>Go to <b>My Bets</b>.</li>
         <li>Pick your horse, then type in the <b>Sportsbet odds</b> (e.g. 4.50). Tap <b>Place</b>. You can change it any time before the jump.</li>
         <li>Bets <b>lock at the jump</b>, and the countdowns are on the Races tab.</li>
-        <li>You get <b>5 bets × $10</b> on any races, plus your <b>Pick of the Day</b>.</li>
-        <li><b>No double-dipping:</b> races where you're repping the group (your Pick of the Day and your quaddie legs) don't show in your 5 bets.</li>
+        <li>You get a <b>group pick</b> (your drawn race, for your team), your own <b>Pick of the Day</b> (any race, $25, ×2), and <b>5 bets × $10</b> on any races.</li>
+        <li><b>No double-dipping:</b> races where you're repping the group (your group-pick race and your quaddie legs) don't show in your bets.</li>
         <li><b>Scratched?</b> You'll see a ⚠️, so pick again. If you leave it, the bet refunds (0 pts).</li>
       </ol></div>
 
     <div class="card"><h3>🎲 The games</h3>
       <table>
         <tr><td><b>Your 5 bets</b><br><span class="mut small">Your picks, any races</span></td><td>5 × $10</td></tr>
-        <tr><td><b>🎯 Pick of the Day</b><br><span class="mut small">Drawn race, one guy v one girl in each</span></td><td>$25 · ×2</td></tr>
+        <tr><td><b>🎯 Pick of the Day</b><br><span class="mut small">Your best bet: any race, a bit more on</span></td><td>16 × $25 · ×2</td></tr>
+        <tr><td><b>👥 Group pick</b><br><span class="mut small">Drawn race, one guy v one girl in each (Steaks race excluded: that's the Feature)</span></td><td>16 × $25</td></tr>
         <tr><td><b>🐎 Boys Flem quaddie</b> (R6–R9)<br><span class="mut small">Drawn 4 + 4: you pick in your 2 legs</span></td><td>$125</td></tr>
         <tr><td><b>🐎 Girls Flem quaddie</b> (R6–R9)<br><span class="mut small">Same as the boys</span></td><td>$125</td></tr>
         <tr><td><b>🐎 Rosehill mixed quaddie</b> (R7–R10)<br><span class="mut small">All 16 pick every leg</span></td><td>$200</td></tr>
         <tr><td><b>🥩 Steaks Day Feature</b> (Flem R8, 5:10pm)<br><span class="mut small">Team vote: guys' horse v girls' horse, $100 each-way each. 🥂 Glasses up!</span></td><td>$200 · ×3</td></tr>
         <tr><td><b>🆓 Get Out of Jail</b><br><span class="mut small">Guys on Flem R9 · Girls on Rose R10</span></td><td>2 × $25</td></tr>
         <tr><td><b>🎡 Mysteries</b><br><span class="mut small">The wheel picks a race, then a horse. Watch it spin live!</span></td><td>4 × $25</td></tr>
-        <tr><td><b>Total pot</b></td><td>$2,000</td></tr>
+        <tr><td><b>Total</b></td><td>$2,400</td></tr>
       </table></div>
 
     <div class="card"><h3>🏆 Points & boards</h3>
       <ul>
         <li><b>Points = profit.</b> A win scores stake × odds − stake (e.g. $10 @ 4.50 = +35). A loss scores −stake.</li>
-        <li><b>Pick of the Day ×2</b>, <b>Feature ×3</b>. Each-way is half on the win and half on the place.</li>
+        <li><b>Pick of the Day ×2</b>, <b>Feature ×3</b>, group pick ×1. Each-way is half on the win and half on the place.</li>
         <li><b>Quaddies:</b> +${QUADDIE_LEG_PTS} for every leg you pick right, to your team. Once all 4 legs are run, the Sportsbet return minus the stake is added (the Rosehill quaddie splits 50/50).</li>
-        <li><b>Players & Couples</b> boards count your own 6 bets. <b>Guys v Girls</b> counts everything, including the team games.</li>
+        <li><b>Players & Couples</b> boards count your own bets: the 5 plus Pick of the Day. <b>Guys v Girls</b> counts everything, including group picks and the team games.</li>
         <li>🥄 <b>Mug Punter</b> = last on the Players board when the day ends.</li>
         <li>The <b>Group P&L</b> up top is the real money back from Sportsbet.</li>
       </ul></div>
@@ -535,7 +558,7 @@ function renderRules(){
     ${me.is_admin?`<div class="card"><h3>🛠️ Admin: running the day</h3>
       <ol>
         <li><b>Fields:</b> loaded. Late scratchings go in Admin → the race → <i>Field · load / scratch</i> → tap the horse.</li>
-        <li><b>Draws:</b> Pick of the Day and the Flem quaddie splits are done. Re-drawing asks first.</li>
+        <li><b>Draws:</b> group-pick races and the Flem quaddie splits are done. Re-drawing asks first.</li>
         <li><b>Mysteries:</b> Admin → Spin. The wheel spins live on every open phone.</li>
         <li><b>Team bets:</b> Admin → <i>Group bets: horse & odds</i>. Enter the Get Out horses and the odds you took for each team bet.</li>
         <li><b>Feature:</b> tap <i>Lock feature votes</i> before 5:10, then enter both teams' odds.</li>
@@ -675,7 +698,7 @@ function renderAdmin(){
   const v=el(`<div class="wrap"><h2 style="margin-top:14px">🛠️ Admin <span class="mut small">(${esc(myPlayer().display_name)})</span></h2>
     <div class="card"><b>Draws & setup</b>
       <div class="grid" style="margin-top:8px">
-        <button class="btn sec" id="drawPod">🎯 Draw Pick-of-the-Day races</button>
+        <button class="btn sec" id="drawPod">👥 Draw group-pick races</button>
         <button class="btn sec" id="drawQ">🐎 Draw Flem quaddie splits</button>
         <button class="btn sec" id="lockFeat">🥩 Lock feature votes (most-voted runs)</button>
       </div><div class="hint" id="aMsg"></div></div>
@@ -801,7 +824,7 @@ function isScratched(raceId,num){ return (S.data.runners||[]).some(x=>x.race_id=
 function picksOn(raceId,num){
   const pn=id=>{const p=(S.data.players||[]).find(p=>p.id===id);return p?p.display_name:'?';};
   const out=[];
-  (S.data.bets||[]).filter(b=>b.race_id===raceId&&b.runner_number===num).forEach(b=>out.push(pn(b.player_id)+(b.bet_type==='pick_of_day'?' (POD)':'')));
+  (S.data.bets||[]).filter(b=>b.race_id===raceId&&b.runner_number===num).forEach(b=>out.push(pn(b.player_id)+(b.bet_type==='pick_of_day'?' (POD)':b.bet_type==='group_pick'?' (group pick)':'')));
   (S.data.quaddie_entries||[]).forEach(e=>{ const q=(S.data.quaddies||[]).find(q=>q.id===e.quaddie_id);
     if(q && (q.leg_race_ids||[])[e.leg_index-1]===raceId && e.runner_number===num) out.push(pn(e.player_id)+' (quaddie)'); });
   if(raceId===108){
@@ -834,7 +857,7 @@ function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor
 async function drawPod(){
   await loadAll(); // the admin phone may have slept and missed live updates
   // 8 nominated races, assign each of 8 boys to one race, each of 8 girls to one race (random)
-  if((S.data.pod_assignments||[]).length && !confirm('Already drawn. Re-draw Pick of the Day? Everyone gets a new race, and any POD bets already placed stay on the old race.')) return;
+  if((S.data.pod_assignments||[]).length && !confirm('Already drawn. Re-draw the group-pick races? Everyone gets a new race, and group picks already placed stay on the old race.')) return;
   const noms=(S.data.races||[]).filter(r=>r.pod_nominated).sort((a,b)=>a.sort_order-b.sort_order);
   const boys=shuffle((S.data.players||[]).filter(p=>p.gender==='M'));
   const girls=shuffle((S.data.players||[]).filter(p=>p.gender==='F'));
@@ -842,7 +865,7 @@ async function drawPod(){
   boys.forEach((p,i)=>rows.push({player_id:p.id,race_id:noms[i%noms.length].id}));
   girls.forEach((p,i)=>rows.push({player_id:p.id,race_id:noms[i%noms.length].id}));
   const {error}=await sb.from('pod_assignments').upsert(rows,{onConflict:'player_id'});
-  msg(error?('Error: '+error.message):'Pick-of-the-Day races drawn ✓'); await loadAll(); render();
+  msg(error?('Error: '+error.message):'Group-pick races drawn ✓'); await loadAll(); render();
 }
 async function drawQuaddieSplits(){
   await loadAll(); // the admin phone may have slept and missed live updates
@@ -1037,7 +1060,7 @@ async function settleRace(r,winStr,plcStr){
   // settle individual + pod bets on this race
   const bets=(S.data.bets||[]).filter(b=>b.race_id===r.id);
   for(const b of bets){
-    const mult = b.bet_type==='pick_of_day'?2:1;
+    const mult = b.bet_type==='pick_of_day'?2:1;   // group_pick and individual ×1
     let status='lost', payout=0, pts=0;
     if(scratched.has(b.runner_number)){ status='scratched'; payout=Number(b.stake); pts=0; } // refunded
     else if(b.runner_number===win){ status='won'; payout=Number(b.stake)*Number(b.odds||0); pts=(payout-b.stake)*mult;
