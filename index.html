@@ -85,6 +85,14 @@
   .count{font-variant-numeric:tabular-nums;font-weight:800;color:var(--gold2)}
   hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   .tagline{font-size:11px;color:var(--mut);text-align:center;margin:6px 0 2px}
+  .wheelwrap{position:fixed;inset:0;background:rgba(3,14,10,.98);z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center}
+  .wheelstage{position:relative;width:280px;height:280px;margin:14px 0}
+  .wheel{position:absolute;inset:0;border-radius:50%;border:6px solid var(--gold);transition:transform 5.2s cubic-bezier(.1,.6,.1,1);box-shadow:0 0 0 4px #0b3d2e,0 12px 44px #000}
+  .wheel .lab{position:absolute;left:50%;top:50%;transform-origin:center;font-size:12px;font-weight:800;color:#eaf5ee;white-space:nowrap}
+  .wpointer{position:absolute;top:-8px;left:50%;transform:translateX(-50%);z-index:3;width:0;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-top:26px solid var(--gold);filter:drop-shadow(0 2px 3px #000)}
+  .whub{position:absolute;left:50%;top:50%;width:48px;height:48px;transform:translate(-50%,-50%);background:var(--green);border:3px solid var(--gold);border-radius:50%;z-index:2;display:flex;align-items:center;justify-content:center;font-size:22px}
+  .wtitle{font-size:17px;font-weight:800;color:var(--gold2);margin-bottom:2px}
+  .bigreveal{font-size:19px;line-height:1.55;font-weight:700}
 </style>
 </head>
 <body>
@@ -561,7 +569,7 @@ function renderAdmin(){
   const sb_=v.querySelector('#spinBox');
   (S.data.group_bets||[]).filter(g=>g.category==='mystery').forEach(m=>{
     const b=el(`<button class="btn sec sm">🎡 Spin ${esc(m.label)}${m.race_id?' (re-spin)':''}</button>`);
-    b.onclick=()=>spinMystery(m); sb_.appendChild(b);
+    b.onclick=()=>openMysteryWheel(m); sb_.appendChild(b);
   });
   const gbBox=v.querySelector('#gbBox');
   (S.data.group_bets||[]).slice().sort((a,b)=>a.id-b.id).forEach(g=>gbBox.appendChild(groupBetEditor(g)));
@@ -688,6 +696,67 @@ async function spinMystery(m){
   const {error}=await sb.from('group_bets').update({race_id:race.id,runner_number:rn,odds:null}).eq('id',m.id);
   if(error){ alert(error.message); return; }
   msg(`🎡 ${m.label}: R${race.race_no} ${race.name} → #${rn}`); await loadAll(); render();
+}
+async function openMysteryWheel(m){
+  const races=(S.data.races||[]).filter(r=>r.track===m.track).sort((a,b)=>a.sort_order-b.sort_order);
+  if(!races.length){ spinMystery(m); return; }
+  const ov=el(`<div class="wheelwrap">
+    <div style="font-size:13px;color:var(--mut)">🎡 ${esc(m.label)}</div>
+    <div class="wtitle" id="wtitle"></div>
+    <div id="stage"></div>
+    <div id="ctrl" style="margin-top:14px"></div>
+    <button class="btn sec sm" id="wclose" style="margin-top:16px">Close</button></div>`);
+  document.body.appendChild(ov);
+  ov.querySelector('#wclose').onclick=()=>ov.remove();
+  const stage=ov.querySelector('#stage'), ctrl=ov.querySelector('#ctrl'), wt=ov.querySelector('#wtitle');
+  wt.textContent='Spin 1 — the RACE';
+  const ri=await wheelSpin(stage,ctrl,races.map(r=>'R'+r.race_no));
+  const race=races[ri];
+  wt.textContent='Spin 2 — the HORSE · R'+race.race_no;
+  const runners=(S.data.runners||[]).filter(x=>x.race_id===race.id&&!x.scratched).sort((a,b)=>a.number-b.number);
+  const nums=runners.length?runners.map(r=>r.number):Array.from({length:12},(_,i)=>i+1);
+  const hi=await wheelSpin(stage,ctrl,nums.map(n=>'#'+n));
+  const rn=nums[hi];
+  await sb.from('group_bets').update({race_id:race.id,runner_number:rn}).eq('id',m.id);
+  wt.textContent='🥂 Locked in!';
+  stage.innerHTML=`<div class="bigreveal">${esc(m.label)}<br><b>R${race.race_no} ${esc(race.name)}</b><br>→ <b style="font-size:30px;color:var(--gold)">#${rn}</b></div>`;
+  ctrl.innerHTML='';
+  const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=async()=>{ov.remove();await loadAll();render();}; ctrl.appendChild(d);
+}
+function wheelSpin(stage,ctrl,labels){
+  return new Promise(resolve=>{
+    const N=labels.length, seg=360/N;
+    const cols=['#0f5138','#124031','#1a5a3f','#0c3f2d'];
+    const stops=labels.map((_,i)=>`${cols[i%cols.length]} ${i*seg}deg ${(i+1)*seg}deg`).join(',');
+    stage.innerHTML='';
+    const wrap=el(`<div class="wheelstage"><div class="wpointer"></div><div class="wheel"></div><div class="whub">🐎</div></div>`);
+    const wheel=wrap.querySelector('.wheel');
+    wheel.style.background=`conic-gradient(${stops})`;
+    labels.forEach((t,i)=>{
+      const c=i*seg+seg/2;
+      const lab=el(`<div class="lab">${esc(t)}</div>`);
+      lab.style.transform=`translate(-50%,-50%) rotate(${c}deg) translateY(-116px)`;
+      wheel.appendChild(lab);
+    });
+    stage.appendChild(wrap);
+    ctrl.innerHTML='';
+    const btn=el(`<button class="btn" style="font-size:18px;padding:14px 30px">🎡 SPIN</button>`);
+    ctrl.appendChild(btn);
+    let cur=0;
+    btn.onclick=()=>{
+      btn.disabled=true;
+      const i=Math.floor(Math.random()*N);
+      const center=i*seg+seg/2;
+      const want=((360-center)%360)+(Math.random()-0.5)*seg*0.5;
+      let T=cur-(cur%360)+want+6*360;
+      if(T<=cur+360) T+=360;
+      cur=T;
+      requestAnimationFrame(()=>{wheel.style.transform=`rotate(${T}deg)`;});
+      let done=false; const finish=()=>{if(done)return;done=true;resolve(i);};
+      wheel.addEventListener('transitionend',finish,{once:true});
+      setTimeout(finish,5600);
+    };
+  });
 }
 async function settleRace(r,winStr,plcStr){
   const win=Number(winStr); if(!win){alert('Enter winner #');return;}
