@@ -418,14 +418,16 @@ function renderGames(){
   const v=el(`<div class="wrap"><h2 style="margin-top:14px">🎲 Games</h2>
     <div class="tabs">
       <div class="tab ${gameTab==='quaddies'?'on':''}" data-t="quaddies">Quaddies</div>
-      <div class="tab ${gameTab==='feature'?'on':''}" data-t="feature">🥩 Feature</div>
-      <div class="tab ${gameTab==='myst'?'on':''}" data-t="myst">🎡 Mysteries</div>
+      <div class="tab ${gameTab==='feature'?'on':''}" data-t="feature">Feature</div>
+      <div class="tab ${gameTab==='myst'?'on':''}" data-t="myst">Mysteries</div>
+      <div class="tab ${gameTab==='getout'?'on':''}" data-t="getout">Get&nbsp;Out</div>
     </div><div id="gbody"></div></div>`);
   v.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{gameTab=t.dataset.t;render();});
   const body=v.querySelector('#gbody');
   if(gameTab==='quaddies') renderQuaddies(body);
   else if(gameTab==='feature') renderFeature(body);
-  else renderMysteries(body);
+  else if(gameTab==='myst') renderMysteries(body);
+  else renderGetout(body);
   return v;
 }
 function renderQuaddies(box){
@@ -513,11 +515,12 @@ function renderMysteries(box){
     box.appendChild(el(`<div class="card"><div class="spread"><b>🎡 ${esc(m.label)}</b><span class="pill ${m.gender_scope==='M'?'blue':'rose'}">$${m.stake}</span></div>
       <div class="small" style="margin-top:6px">${r?`<b>R${r.race_no} ${esc(r.name)}</b> → <b>#${m.runner_number||'?'}</b> ${m.status!=='open'?`· <span class="pill done">${m.status.toUpperCase()}</span>`:''}`:'<span class="mut">Not spun yet 🎡</span>'}</div></div>`));
   });
-  // get out of jail
-  box.appendChild(el(`<h3 style="margin-top:14px">🆓 Get Out of Jail</h3>`));
+}
+function renderGetout(box){
+  box.appendChild(el(`<p class="hint">Final-race redemption — one last-race bet per team. 👔 Boys on Flem R9, 👗 Girls on Rose R10.</p>`));
   (S.data.group_bets||[]).filter(g=>g.category==='getout').forEach(g=>{
     const r=raceById(g.race_id);
-    box.appendChild(el(`<div class="card"><div class="spread"><b>${esc(g.label)}</b><span class="pill ${g.gender_scope==='M'?'blue':'rose'}">$${g.stake}</span></div>
+    box.appendChild(el(`<div class="card"><div class="spread"><b>🆓 ${esc(g.label)}</b><span class="pill ${g.gender_scope==='M'?'blue':'rose'}">$${g.stake}</span></div>
       <div class="mut small">${r?`R${r.race_no} ${esc(r.track)} · ${melbTime(r.jump_time)}`:''} · last-race redemption</div>
       <div class="small" style="margin-top:6px">${g.runner_number?`<b>#${g.runner_number}</b> @ ${g.odds||'?'}`:'<span class="mut">Horse not set yet</span>'} ${g.status!=='open'?`· <span class="pill done">${g.status.toUpperCase()}</span>`:''}</div></div>`));
   });
