@@ -391,6 +391,7 @@ function betEditor(race,type,stake,blocked){
       <div class="mut small">${melbTime(race.jump_time)} · $${stake}${type==='pick_of_day'?' · your assigned race':''}</div></div>
       <div>${locked?'<span class="pill lock">LOCKED</span>':''}</div></div>`);
   if(blocked){ box.appendChild(el(`<div class="hint">You're repping the group here — no double-dipping.</div>`)); return box; }
+  if(mine && !locked && isScratched(race.id,mine.runner_number)) box.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ #${mine.runner_number} ${esc(mine.horse_name||'')} was scratched — pick again (it refunds if you leave it).</div>`));
   if(locked){
     box.appendChild(el(`<div class="small">${mine?`Your pick: #${mine.runner_number} ${esc(mine.horse_name||'')} @ ${mine.odds||'?'} — <b class="${mine.points>=0?'pos':'neg'}">${mine.status.toUpperCase()}${mine.points?` ${mine.points>=0?'+':''}${Math.round(mine.points)}`:''}</b>`:'<span class="mut">No bet placed.</span>'}</div>`));
     return box;
@@ -477,11 +478,13 @@ function quaddieLeg(q,race,legIndex){
     <div><label>Leg ${legIndex}</label><div class="small" style="font-weight:700">R${race.race_no}</div></div>
     <div>${rOpts}</div>
     <button class="btn sm save" ${locked?'disabled':''}>${mine?'✓':'Save'}</button></div>`);
+  const warn = mine && !locked && isScratched(race.id,mine.runner_number);
   if(!locked) row.querySelector('.save').onclick=async()=>{
     const rn=(row.querySelector('.rn')||row.querySelector('.rn2')).value; if(!rn){alert('Pick a number');return;}
     const {error}=await sb.from('quaddie_entries').upsert({quaddie_id:q.id,player_id:S.me,leg_index:legIndex,runner_number:Number(rn)},{onConflict:'quaddie_id,player_id,leg_index'});
     if(error){alert(error.message);return;} await loadAll(); render();
   };
+  if(warn){ const w=el(`<div><div class="warn" style="margin-top:6px">⚠️ Leg ${legIndex}: #${mine.runner_number} was scratched — pick again.</div></div>`); w.appendChild(row); return w; }
   return row;
 }
 function renderFeature(box){
@@ -496,6 +499,7 @@ function renderFeature(box){
     <hr><div class="small">Your team (${me.gender==='M'?'👔 Guys':'👗 Girls'}) votes one horse — most votes runs.</div>
     <div class="fb"></div></div>`);
   const fb=card.querySelector('.fb');
+  if(myVote && !(pick&&pick.locked) && isScratched(108,myVote.runner_number)) fb.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ Your vote #${myVote.runner_number} was scratched — vote again.</div>`));
   if(pick && pick.locked){ fb.appendChild(el(`<div class="ok">Locked in: <b>#${pick.runner_number}</b> runs for the ${me.gender==='M'?'Guys':'Girls'}.</div>`)); }
   const rOpts = runners.length
     ? `<select class="rn"><option value="">Vote a runner…</option>${runners.map(r=>`<option value="${r.number}" ${myVote&&myVote.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
@@ -510,7 +514,7 @@ function renderFeature(box){
     fb.appendChild(row);
   }
   // tally
-  const votes=(S.data.feature_votes||[]).filter(v=>v.gender===me.gender);
+  const votes=(S.data.feature_votes||[]).filter(v=>v.gender===me.gender && !isScratched(108,v.runner_number));
   const tally={}; votes.forEach(v=>tally[v.runner_number]=(tally[v.runner_number]||0)+1);
   const trows=Object.entries(tally).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="spread small"><span>#${n}</span><span class="mut">${c} vote${c>1?'s':''}</span></div>`).join('');
   if(trows) fb.appendChild(el(`<hr><div class="mut small">Your team's votes</div>${trows}`));
@@ -604,7 +608,8 @@ function adminRace(r){
     <div class="hint">Enter result → settles all bets on this race. Bets on scratched runners are refunded (0 pts).</div>
     <details class="fdet" ${S.openFields.has(r.id)?'open':''}><summary class="small" style="margin-top:6px">Field (${runners.length} runners${nScr?`, ${nScr} scratched`:''}) · load / scratch</summary>
       <div class="scr row" style="flex-wrap:wrap;gap:6px;margin:8px 0"></div>
-      <textarea class="fld" rows="4" placeholder="One runner per line, e.g.&#10;1 Horse Name&#10;2 Other Horse"></textarea>
+      <textarea class="fld" rows="4" placeholder="One runner per line, e.g.&#10;1 Horse Name&#10;2 Other Horse&#10;3 Scratched Horse SCR"></textarea>
+      <div class="hint pv"></div>
       <button class="btn sm sec loadf" style="margin-top:6px">Load / update field</button>
     </details></div>`);
   card.querySelector('.settle').onclick=()=>settleRace(r,card.querySelector('.win').value,card.querySelector('.plc').value);
@@ -613,24 +618,65 @@ function adminRace(r){
   runners.forEach(x=>{
     const b=el(`<button class="btn sm ${x.scratched?'':'sec'}" title="Tap to ${x.scratched?'un-scratch':'scratch'}">${x.scratched?'❌ ':''}#${x.number} ${esc(x.horse_name)}</button>`);
     b.onclick=async()=>{
-      if(!confirm(`${x.scratched?'Un-scratch':'Scratch'} #${x.number} ${x.horse_name}?`)) return;
+      const picks=picksOn(r.id,x.number);
+      if(!confirm(`${x.scratched?'Un-scratch':'Scratch'} #${x.number} ${x.horse_name}?${!x.scratched&&picks.length?`\n\n${picks.length} pick${picks.length>1?'s are':' is'} on it: ${picks.join(', ')}.\nThey'll see a "pick again" warning; bets left on it refund at settle.`:''}`)) return;
       const {error}=await sb.from('runners').update({scratched:!x.scratched}).eq('id',x.id);
       if(error){alert(error.message);return;} await loadAll(); render();
     };
     scr.appendChild(b);
   });
+  const fld=card.querySelector('.fld'), pv=card.querySelector('.pv');
+  fld.oninput=()=>{ const p=parseField(fld.value);
+    pv.innerHTML = p.length ? `Reads as ${p.length}: ${p.map(x=>`<b>${x.number}</b> ${esc(x.horse_name)}${x.scratched?' ❌':''}`).join(' · ')}`
+      : (fld.value.trim()?'<span class="neg">Nothing readable — start each line with the runner number.</span>':''); };
   card.querySelector('.loadf').onclick=async()=>{
-    const rows=parseField(card.querySelector('.fld').value).map(x=>({race_id:r.id,...x}));
-    if(!rows.length){ alert('No runners found. Use one per line: 1 Horse Name'); return; }
-    const {error}=await sb.from('runners').upsert(rows,{onConflict:'race_id,number'});
-    if(error){alert(error.message);return;} S.dirty=false; await loadAll(); render();
+    const parsed=parseField(fld.value);
+    if(!parsed.length){ alert('No runners found. Use one per line: 1 Horse Name'); return; }
+    // names only, so re-pasting a field never un-scratches anyone; SCR lines are scratched after
+    const {error}=await sb.from('runners').upsert(parsed.map(x=>({race_id:r.id,number:x.number,horse_name:x.horse_name})),{onConflict:'race_id,number'});
+    if(error){alert(error.message);return;}
+    const scr=parsed.filter(x=>x.scratched).map(x=>x.number);
+    if(scr.length){ const {error:e2}=await sb.from('runners').update({scratched:true}).eq('race_id',r.id).in('number',scr); if(e2) alert('Field loaded, but scratching failed: '+e2.message); }
+    S.dirty=false; await loadAll(); render();
   };
   return card;
 }
-// "1 Horse Name", "1. Horse", "1) Horse", "1 - Horse" → {number, horse_name}
+// Pasted field → [{number, horse_name, scratched}]. Accepts "1 Horse", "1. Horse", "1) Horse", "1 - Horse",
+// "1Horse(4)". Strips barriers "(4)" and weights "58.5kg"; skips jockey/trainer lines from a copied form guide;
+// "SCR"/"scratched" on a line marks it scratched. No numbers at all → numbered 1,2,3… in order.
+// Duplicate numbers keep the last line (a duplicate in one upsert makes Postgres reject the whole load).
 function parseField(text){
-  return (text||'').split(/\r?\n/).map(l=>l.match(/^\s*(\d{1,2})\s*[.)\-:]?\s+(.+?)\s*$/)).filter(Boolean)
-    .map(m=>({number:Number(m[1]),horse_name:m[2]}));
+  const lines=(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const re=/^(\d{1,2})(?:\s*[.):\-–]\s*|\s+|(?=[A-Za-z]))(.+)$/;
+  const anyNum=lines.some(l=>re.test(l));
+  const out=new Map(); let auto=0;
+  for(const l of lines){
+    let num,name; const m=l.match(re);
+    if(m){ num=Number(m[1]); name=m[2]; }
+    else if(!anyNum){ num=++auto; name=l; }
+    else continue;
+    const scratched=/\b(scr|scratched)\b/i.test(name);
+    name=name.replace(/\b(scr|scratched)\b\.?/ig,' ')
+             .split(/\s*\(|\t|\s{2,}|\s+\d{2}(?:\.\d)?\s*kg\b/i)[0]
+             .replace(/[\s.\-–|]+$/,'').trim();
+    if(num>=1 && num<=30 && name) out.set(num,{number:num,horse_name:name,scratched});
+  }
+  return [...out.values()].sort((a,b)=>a.number-b.number);
+}
+function isScratched(raceId,num){ return (S.data.runners||[]).some(x=>x.race_id===raceId&&x.number===num&&x.scratched); }
+// Who has a pick on this runner — shown before scratching so admins know who to tell.
+function picksOn(raceId,num){
+  const pn=id=>{const p=(S.data.players||[]).find(p=>p.id===id);return p?p.display_name:'?';};
+  const out=[];
+  (S.data.bets||[]).filter(b=>b.race_id===raceId&&b.runner_number===num).forEach(b=>out.push(pn(b.player_id)+(b.bet_type==='pick_of_day'?' (POD)':'')));
+  (S.data.quaddie_entries||[]).forEach(e=>{ const q=(S.data.quaddies||[]).find(q=>q.id===e.quaddie_id);
+    if(q && (q.leg_race_ids||[])[e.leg_index-1]===raceId && e.runner_number===num) out.push(pn(e.player_id)+' (quaddie)'); });
+  if(raceId===108){
+    (S.data.feature_votes||[]).filter(v=>v.runner_number===num).forEach(v=>out.push(pn(v.player_id)+' (feature vote)'));
+    (S.data.feature_picks||[]).filter(p=>p.locked&&p.runner_number===num).forEach(p=>out.push((p.gender==='M'?'Guys':'Girls')+' feature pick'));
+  }
+  (S.data.group_bets||[]).filter(g=>g.category!=='feature'&&g.race_id===raceId&&g.runner_number===num).forEach(g=>out.push(g.label));
+  return out;
 }
 function groupBetEditor(g){
   const fp = g.category==='feature' ? (S.data.feature_picks||[]).find(p=>p.gender===g.gender_scope) : null;
@@ -676,7 +722,7 @@ async function drawQuaddieSplits(){
 }
 async function lockFeature(){
   for(const g of ['M','F']){
-    const votes=(S.data.feature_votes||[]).filter(v=>v.gender===g);
+    const votes=(S.data.feature_votes||[]).filter(v=>v.gender===g && !isScratched(108,v.runner_number)); // scratched horses can't run
     if(!votes.length) continue;
     const tally={}; votes.forEach(v=>tally[v.runner_number]=(tally[v.runner_number]||0)+1);
     const win=Object.entries(tally).sort((a,b)=>b[1]-a[1])[0][0];
