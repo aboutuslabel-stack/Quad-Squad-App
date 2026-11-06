@@ -30,32 +30,38 @@ _Last updated: 6 Nov 2026 (night before)_
 - **Admin** — run POD & Flem-quaddie **random draws**, **spin** mysteries, **lock** feature votes, **settle results** (auto-scores individual + POD + group bets and updates the board), edit Group P&L
 - **Realtime** sync across devices
 
-## ⚠️ Gaps / NOT built yet (be honest with the group)
-1. **🎡 Spin-wheel animation** — not built. Mysteries are spun by an instant Admin button, no visual wheel.
-2. **Runner fields** — not loaded. Picks are **by number** until the fields go in. **There is currently NO in-app screen to enter runners/scratchings** — they're loaded via the database (Claude/dev). _Recommended next build: an Admin "add runners" screen._
-3. **Quaddie scoring** — entries are captured, but quaddie **payouts/points are NOT auto-calculated** yet. Needs building or manual scoring.
-4. **Feature each-way payout** — approximated (place ≈ ¼ odds) at settle time; sanity-check the number.
-5. **Push notifications / alerts** — not built (app works as a normal web link + add-to-home).
-6. **No full test pass** — plumbing verified (serves + DB reads), but game flows not click-tested end to end.
-7. **Elly's surname/spelling** — unconfirmed (shown as "Elly").
-8. **Player photos** — not added (initials shown).
+## ✅ Added since first handover
+- **🎡 Spin-wheel** — animated two-stage wheel (race → horse) on the admin's phone. Only spins onto races still open with a field loaded; asks before a re-spin.
+- **Runner fields in-app** — Admin → each race → paste the field → **Load / update field**. Scratch runners there too; scratched bets refund (0 pts).
+- **Quaddie scoring** — 10 pts per correct leg to the picker's team, plus the Sportsbet return (entered in Admin) minus stake once all 4 legs are run. Mixed quaddie splits 50/50.
+- **Team-bet odds** — Admin sets horse + odds for Feature, Get Out of Jail and Mysteries. Settling skips and flags any team bet with no horse/odds instead of scoring it a loss.
+- Odds now required on every bet; max 5 individual bets; live updates no longer wipe what you're typing.
+- Get Out of Jail moved to its own **Get Out** tab.
+
+## ⚠️ Still open
+1. **Runner fields not loaded yet** — picks are by number until you load them (Admin, per race).
+2. **Feature each-way payout** — approximated (place ≈ ¼ of win odds). Sanity-check the number after R8.
+3. **Wheel only animates on the admin's phone** — everyone else sees the result appear in Mysteries. Hold the phone up / cast it.
+4. **Push notifications / alerts** — not built.
+5. **No full click-through test** — plumbing verified (site serves, DB reads, code checks), game flows not tested end to end.
+6. **Elly's spelling** and **player photos** still to come.
 
 ## 🕹️ How to run it on the day (Admin = Liam / Blake)
 1. **Before 2:30pm:** Admin tab →
+   - **Load the field** for each race (paste runners → Load / update field)
    - **Draw Pick-of-the-Day races** (assigns each person a POD race)
    - **Draw Flem quaddie splits** (random 4+4 per gender)
-   - Once people have voted, **Lock feature votes** (before R8, 5:10pm)
-2. **Each race result:** Admin → find the race → enter **Winner #** (+ placed #s for e/w) → **Settle** → all bets settle, leaderboard moves.
-3. **Mysteries:** Admin → **Spin** each one (random race + horse).
-4. **Group P&L:** Admin → enter total $ returned from Sportsbet as you go.
+2. **Mysteries:** Admin → **Spin** → wheel spins race, then horse. Needs that race's field loaded and still open.
+3. **Team bets:** Admin → *Group bets — horse & odds* → enter the odds you took on Sportsbet (Feature horse comes from the locked vote; **Lock feature votes** before R8, 5:10pm).
+4. **Each race result:** Admin → the race → **Winner #** (+ placed #s for e/w) → **Settle**. Bets settle, board moves. Fix any flagged team bet missing odds, then re-settle.
+5. **Quaddies:** once all 4 legs are settled, enter the $ returned in *Quaddie returns* (0 if it missed).
+6. **Group P&L:** enter total $ returned from Sportsbet as you go.
 
-## 📋 TODO before 2:30pm tomorrow (priority order)
-1. **Load runner fields** (Sportsbet screenshots → horses by name) — biggest.
-2. Decide/handle **quaddie scoring**.
-3. **Run the draws** (POD + quaddie splits) in Admin.
-4. Add **player photos** + confirm **Elly's spelling**.
-5. **Quick test pass** (place a bet, settle a race, watch the board).
-6. _Optional:_ build the **spin-wheel animation** and an **Admin runner-entry screen**.
+## 📋 TODO before 2:30pm tomorrow
+1. **Load runner fields** for all 12 races — biggest.
+2. **Run the draws** (POD + quaddie splits).
+3. **Quick test**: place a bet, settle a race, spin a mystery, watch the board. **There's no in-app reset** — settling marks the race resulted and locks it — so after testing, the test data has to be wiped from the database (ask Claude) before the real day.
+4. Player photos + Elly's spelling.
 
 ## 🛠️ Making changes
 Edit `index.html` (or `supabase/schema.sql` for data) → commit → push to `main` → Railway redeploys in ~1 min. Full game design is in **BRIEF.md**.
