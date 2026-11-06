@@ -21,11 +21,12 @@
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     background:var(--bg); color:var(--paper); -webkit-font-smoothing:antialiased;
-    padding-bottom:84px; min-height:100vh;
+    padding-bottom:calc(84px + env(safe-area-inset-bottom)); min-height:100vh;
   }
   a{color:var(--gold)}
   .wrap{max-width:560px;margin:0 auto;padding:0 16px}
   h1,h2,h3{margin:.2em 0}
+  #app{padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
   .hero{position:relative;height:190px;overflow:hidden;border-bottom:2px solid var(--gold)}
   .hero img{width:100%;height:100%;object-fit:cover;filter:saturate(1.05)}
   .hero .ov{position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,35,26,.1),rgba(7,35,26,.92))}
@@ -50,7 +51,7 @@
   .btn.sm{padding:8px 12px;font-size:13px;border-radius:10px}
   .btn:disabled{opacity:.45}
   .grid{display:grid;gap:8px}
-  input,select,textarea{background:#09271d;border:1px solid var(--line);color:var(--paper);border-radius:10px;padding:10px;font-size:15px;width:100%}
+  input,select,textarea{background:#09271d;border:1px solid var(--line);color:var(--paper);border-radius:10px;padding:10px;font-size:16px;width:100%}
   label{font-size:12px;color:var(--mut)}
   .tabs{display:flex;gap:6px;margin:10px 0}
   .tab{flex:1;text-align:center;padding:9px;border-radius:10px;background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--mut)}
@@ -71,9 +72,18 @@
   .race{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
   .race .tno{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto}
   .race .flem{background:rgba(47,111,176,.22);color:#bcd7f2}
+  .reps{margin-top:6px;display:grid;gap:3px}
+  .reps div{font-size:12px;color:#cfe0d8;line-height:1.35}
+  .reps .me{color:var(--gold);font-weight:800}
+  .rules h3{margin:4px 0 6px;font-size:16px}
+  .rules p,.rules li{font-size:14px;line-height:1.5;color:#dfeae5}
+  .rules ul,.rules ol{margin:4px 0;padding-left:20px}
+  .rules table{width:100%;border-collapse:collapse;font-size:13px}
+  .rules td{padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  .rules td:last-child{text-align:right;white-space:nowrap;color:var(--gold2);font-weight:700}
   .race .rose{background:rgba(228,184,74,.18);color:var(--gold2)}
-  .overlay{position:fixed;inset:0;background:rgba(3,14,10,.97);z-index:50;display:flex;flex-direction:column}
-  .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:2px solid var(--gold);border-radius:18px 18px 0 0;padding:16px;z-index:60;max-height:86vh;overflow:auto}
+  .overlay{position:fixed;inset:0;background:rgba(3,14,10,.97);z-index:50;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+  .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:2px solid var(--gold);border-radius:18px 18px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom));z-index:60;max-height:86vh;overflow:auto}
   .sheet .wrap{padding:0}
   .center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%}
   .namebtn{width:100%;text-align:left;padding:12px 14px;border-radius:12px;background:var(--card);border:1px solid var(--line);color:var(--paper);font-size:16px;font-weight:700;margin:6px 0;display:flex;align-items:center;gap:10px}
@@ -85,7 +95,7 @@
   .count{font-variant-numeric:tabular-nums;font-weight:800;color:var(--gold2)}
   hr{border:0;border-top:1px solid var(--line);margin:12px 0}
   .tagline{font-size:11px;color:var(--mut);text-align:center;margin:6px 0 2px}
-  .wheelwrap{position:fixed;inset:0;background:rgba(3,14,10,.98);z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center}
+  .wheelwrap{position:fixed;inset:0;background:rgba(3,14,10,.98);z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;padding-top:calc(20px + env(safe-area-inset-top));padding-bottom:calc(20px + env(safe-area-inset-bottom));text-align:center}
   .wheelstage{position:relative;width:280px;height:280px;margin:14px 0}
   .wheel{position:absolute;inset:0;border-radius:50%;border:6px solid var(--gold);transition:transform 5.2s cubic-bezier(.1,.6,.1,1);box-shadow:0 0 0 4px #0b3d2e,0 12px 44px #000}
   .wheel .lab{position:absolute;left:50%;top:50%;transform-origin:center;font-size:12px;font-weight:800;color:#eaf5ee;white-space:nowrap}
@@ -104,6 +114,7 @@
     <a data-view="races"><span class="ic">🐎</span>Races</a>
     <a data-view="bets"><span class="ic">🎰</span>My Bets</a>
     <a data-view="games"><span class="ic">🎲</span>Games</a>
+    <a data-view="rules"><span class="ic">📖</span>Rules</a>
     <a data-view="admin" id="navAdmin" style="display:none"><span class="ic">🛠️</span>Admin</a>
   </div>
 </nav>
@@ -188,7 +199,7 @@ function render(){
   $('#navAdmin').style.display = (me && me.is_admin)?'':'none';
   document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.view===S.view));
   const app = $('#app');
-  const views = {home:renderHome, races:renderRaces, bets:renderBets, games:renderGames, admin:renderAdmin};
+  const views = {home:renderHome, races:renderRaces, bets:renderBets, games:renderGames, rules:renderRules, admin:renderAdmin};
   const y = window.scrollY;
   app.innerHTML = '';
   app.appendChild((views[S.view]||renderHome)());
@@ -314,6 +325,35 @@ function renderBoard(box){
 function coupleLabel(cid){const c=(S.data.couples||[]).find(c=>c.id===cid);return c?c.label:'';}
 
 // ---------- races ----------
+// Who is repping this race: Pick-of-the-Day pair, quaddie legs, feature, get-out and any mystery that landed here.
+function raceReps(r){
+  const P=id=>(S.data.players||[]).find(p=>p.id===id);
+  const nm=p=>p?`<span class="${p.id===S.me?'me':''}">${esc(p.id===S.me?'You':p.display_name)}</span>`:'?';
+  const out=[];
+  const pod=(S.data.pod_assignments||[]).filter(a=>a.race_id===r.id).map(a=>P(a.player_id)).filter(Boolean);
+  if(pod.length){
+    const m=pod.filter(p=>p.gender==='M'), f=pod.filter(p=>p.gender==='F');
+    out.push(`🎯 Pick of the Day: 👔 ${m.map(nm).join(', ')||'—'} <span class="mut">v</span> 👗 ${f.map(nm).join(', ')||'—'}`);
+  }
+  (S.data.quaddies||[]).forEach(q=>{
+    const li=(q.leg_race_ids||[]).indexOf(r.id); if(li<0) return;
+    if(q.style==='split'){
+      const grp=li<2?'first':'last';
+      const who=(S.data.quaddie_groups||[]).filter(g=>g.quaddie_id===q.id&&g.grp===grp).map(g=>P(g.player_id)).filter(Boolean);
+      out.push(`🐎 ${q.gender_scope==='M'?'👔 Boys':'👗 Girls'} Flem quaddie leg ${li+1}: ${who.length?who.map(nm).join(', '):'<span class="mut">draw pending</span>'}`);
+    } else out.push(`🐎 Rosehill quaddie leg ${li+1}: everyone picks a number`);
+  });
+  if(r.id===108){
+    const fp=g=>(S.data.feature_picks||[]).find(p=>p.gender===g);
+    const show=g=>{const p=fp(g);return p&&p.locked&&p.runner_number?`#${p.runner_number}`:'team vote';};
+    out.push(`🥩 Feature ×3 · $100 e/w each: 👔 Guys ${show('M')} <span class="mut">v</span> 👗 Girls ${show('F')}`);
+  }
+  (S.data.group_bets||[]).filter(g=>g.category==='getout'&&g.race_id===r.id).forEach(g=>
+    out.push(`🆓 Get Out of Jail: ${g.gender_scope==='M'?'👔 Guys':'👗 Girls'}${g.runner_number?` #${g.runner_number}`:''}`));
+  (S.data.group_bets||[]).filter(g=>g.category==='mystery'&&g.race_id===r.id).forEach(g=>
+    out.push(`🎡 ${esc(g.label)} → #${g.runner_number}`));
+  return out;
+}
 function renderRaces(){
   const races=(S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
   const v=el(`<div class="wrap"><h2 style="margin-top:14px">🐎 Race Timeline</h2>
@@ -321,13 +361,15 @@ function renderRaces(){
   const box=v.querySelector('#rl');
   races.forEach(r=>{
     const locked=isLocked(r); const resulted=r.status==='resulted';
-    const runnersN=(S.data.runners||[]).filter(x=>x.race_id===r.id).length;
+    const rAll=(S.data.runners||[]).filter(x=>x.race_id===r.id), rScr=rAll.filter(x=>x.scratched).length, runnersN=rAll.length-rScr;
+    const reps=raceReps(r);
     let st = resulted?`<span class="pill done">RESULT ${r.result_win?('#'+r.result_win):''}</span>`
              : locked?`<span class="pill lock">LOCKED</span>`
              : `<span class="count" data-jt="${r.jump_time}">—</span>`;
     box.appendChild(el(`<div class="race"><div class="tno ${r.track==='Flemington'?'flem':'rose'}">R${r.race_no}</div>
       <div style="flex:1"><div style="font-weight:700">${esc(r.name)}${r.id===108?' 🥩':''}</div>
-        <div class="mut small">${esc(r.track)} · ${esc(r.distance||'')} ${r.grade?('· '+esc(r.grade)):''} · ${melbTime(r.jump_time)}${runnersN?` · ${runnersN} runners`:' · fields TBD'}</div></div>
+        <div class="mut small">${esc(r.track)} · ${esc(r.distance||'')} ${r.grade?('· '+esc(r.grade)):''} · ${melbTime(r.jump_time)}${rAll.length?` · ${runnersN} runners${rScr?` (${rScr} scr)`:''}`:' · fields TBD'}</div>
+        ${reps.length?`<div class="reps">${reps.map(x=>`<div>${x}</div>`).join('')}</div>`:''}</div>
       <div style="text-align:right">${st}</div></div>`));
   });
   return v;
@@ -353,6 +395,12 @@ function myQuaddieLegRaces(){
     if(q.style==='split'){ (g.grp==='first'?[legs[0],legs[1]]:[legs[2],legs[3]]).forEach(id=>out.add(id)); }
   });
   return out;
+}
+// Lock is enforced on save too: a form drawn before the jump must not save after it.
+async function jumped(race){
+  await loadAll();
+  if(isLocked(raceById(race.id))){ alert('This race has jumped — picks are locked.'); render(); return true; }
+  return false;
 }
 function myBet(raceId,type){ return (S.data.bets||[]).find(b=>b.player_id===S.me&&b.race_id===raceId&&b.bet_type===type); }
 function renderBets(){
@@ -391,6 +439,7 @@ function betEditor(race,type,stake,blocked){
       <div class="mut small">${melbTime(race.jump_time)} · $${stake}${type==='pick_of_day'?' · your assigned race':''}</div></div>
       <div>${locked?'<span class="pill lock">LOCKED</span>':''}</div></div>`);
   if(blocked){ box.appendChild(el(`<div class="hint">You're repping the group here — no double-dipping.</div>`)); return box; }
+  if(mine && !locked && isScratched(race.id,mine.runner_number)) box.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ #${mine.runner_number} ${esc(mine.horse_name||'')} was scratched — pick again (it refunds if you leave it).</div>`));
   if(locked){
     box.appendChild(el(`<div class="small">${mine?`Your pick: #${mine.runner_number} ${esc(mine.horse_name||'')} @ ${mine.odds||'?'} — <b class="${mine.points>=0?'pos':'neg'}">${mine.status.toUpperCase()}${mine.points?` ${mine.points>=0?'+':''}${Math.round(mine.points)}`:''}</b>`:'<span class="mut">No bet placed.</span>'}</div>`));
     return box;
@@ -404,6 +453,7 @@ function betEditor(race,type,stake,blocked){
     <button class="btn sm save">${mine?'Update':'Place'}</button></div>`);
   box.appendChild(ed);
   ed.querySelector('.save').onclick=async()=>{
+    if(await jumped(race)) return;
     const rn = (ed.querySelector('.rn')||ed.querySelector('.rn2')).value;
     const od = ed.querySelector('.od').value;
     if(!rn){ alert('Pick a runner'); return; }
@@ -418,6 +468,84 @@ function betEditor(race,type,stake,blocked){
     await loadAll(); render();
   };
   return box;
+}
+
+// ---------- rules / how to play ----------
+function renderRules(){
+  const me=myPlayer()||{};
+  const pod=myPodRace();
+  const myQ=(S.data.quaddie_groups||[]).filter(g=>g.player_id===S.me).map(g=>{
+    const q=(S.data.quaddies||[]).find(q=>q.id===g.quaddie_id); if(!q) return '';
+    const legs=(q.leg_race_ids||[]).map(raceById); const mine=g.grp==='first'?[legs[0],legs[1]]:[legs[2],legs[3]];
+    return mine.filter(Boolean).map(r=>`R${r.race_no} ${melbTime(r.jump_time)}`).join(' & ');
+  }).filter(Boolean).join('; ');
+  const v=el(`<div class="wrap rules"><h2 style="margin-top:14px">📖 How it works</h2>
+    <p class="hint">Steaks Day · Flemington × Rosehill · first race 2:30pm (Melbourne). Real money on Sportsbet, one live leaderboard, and Guys v Girls.</p>
+
+    <div class="card"><h3>⚡ Your day, ${esc(me.display_name||'')}</h3>
+      <ul>
+        <li><b>Pick of the Day:</b> ${pod?`<b>R${pod.race_no} ${esc(pod.track)} ${esc(pod.name)}</b>, ${melbTime(pod.jump_time)}`:'not drawn yet'}. $25, double points.</li>
+        ${myQ?`<li><b>Your Flem quaddie legs:</b> ${myQ}</li>`:''}
+        <li><b>Rosehill quaddie:</b> everyone picks one horse in each of R7–R10.</li>
+        <li><b>Feature (Champions Stakes, 5:10pm):</b> vote your team's horse in Games → Feature.</li>
+      </ul></div>
+
+    <div class="card"><h3>🎰 Placing a bet</h3>
+      <ol>
+        <li>Go to <b>My Bets</b>.</li>
+        <li>Pick your horse, then type in the <b>Sportsbet odds</b> (e.g. 4.50). Tap <b>Place</b>. You can change it any time before the jump.</li>
+        <li>Bets <b>lock at the jump</b>, and the countdowns are on the Races tab.</li>
+        <li>You get <b>5 bets × $10</b> on any races, plus your <b>Pick of the Day</b>.</li>
+        <li><b>No double-dipping:</b> races where you're repping the group (your Pick of the Day and your quaddie legs) don't show in your 5 bets.</li>
+        <li><b>Scratched?</b> You'll see a ⚠️, so pick again. If you leave it, the bet refunds (0 pts).</li>
+      </ol></div>
+
+    <div class="card"><h3>🎲 The games</h3>
+      <table>
+        <tr><td><b>Your 5 bets</b><br><span class="mut small">Your picks, any races</span></td><td>5 × $10</td></tr>
+        <tr><td><b>🎯 Pick of the Day</b><br><span class="mut small">Drawn race, one guy v one girl in each</span></td><td>$25 · ×2</td></tr>
+        <tr><td><b>🐎 Boys Flem quaddie</b> (R6–R9)<br><span class="mut small">Drawn 4 + 4: you pick in your 2 legs</span></td><td>$125</td></tr>
+        <tr><td><b>🐎 Girls Flem quaddie</b> (R6–R9)<br><span class="mut small">Same as the boys</span></td><td>$125</td></tr>
+        <tr><td><b>🐎 Rosehill mixed quaddie</b> (R7–R10)<br><span class="mut small">All 16 pick every leg</span></td><td>$200</td></tr>
+        <tr><td><b>🥩 Steaks Day Feature</b> (Flem R8, 5:10pm)<br><span class="mut small">Team vote: guys' horse v girls' horse, $100 each-way each. 🥂 Glasses up!</span></td><td>$200 · ×3</td></tr>
+        <tr><td><b>🆓 Get Out of Jail</b><br><span class="mut small">Guys on Flem R9 · Girls on Rose R10</span></td><td>2 × $25</td></tr>
+        <tr><td><b>🎡 Mysteries</b><br><span class="mut small">The wheel picks a race, then a horse. Watch it spin live!</span></td><td>4 × $25</td></tr>
+        <tr><td><b>Total pot</b></td><td>$2,000</td></tr>
+      </table></div>
+
+    <div class="card"><h3>🏆 Points & boards</h3>
+      <ul>
+        <li><b>Points = profit.</b> A win scores stake × odds − stake (e.g. $10 @ 4.50 = +35). A loss scores −stake.</li>
+        <li><b>Pick of the Day ×2</b>, <b>Feature ×3</b>. Each-way is half on the win and half on the place.</li>
+        <li><b>Quaddies:</b> +${QUADDIE_LEG_PTS} for every leg you pick right, to your team. Once all 4 legs are run, the Sportsbet return minus the stake is added (the Rosehill quaddie splits 50/50).</li>
+        <li><b>Players & Couples</b> boards count your own 6 bets. <b>Guys v Girls</b> counts everything, including the team games.</li>
+        <li>🥄 <b>Mug Punter</b> = last on the Players board when the day ends.</li>
+        <li>The <b>Group P&L</b> up top is the real money back from Sportsbet.</li>
+      </ul></div>
+
+    <div class="card"><h3>⏰ Key times</h3>
+      <table>
+        <tr><td>First race · Fisher Stakes</td><td>2:30pm</td></tr>
+        <tr><td>Flem quaddie starts (R6)</td><td>3:50pm</td></tr>
+        <tr><td>Rosehill quaddie starts (R7)</td><td>4:10pm</td></tr>
+        <tr><td>🥩 Feature votes lock before</td><td>5:10pm</td></tr>
+        <tr><td>Last race · Rose R10</td><td>6:05pm</td></tr>
+      </table></div>
+
+    ${me.is_admin?`<div class="card"><h3>🛠️ Admin: running the day</h3>
+      <ol>
+        <li><b>Fields:</b> loaded. Late scratchings go in Admin → the race → <i>Field · load / scratch</i> → tap the horse.</li>
+        <li><b>Draws:</b> Pick of the Day and the Flem quaddie splits are done. Re-drawing asks first.</li>
+        <li><b>Mysteries:</b> Admin → Spin. The wheel spins live on every open phone.</li>
+        <li><b>Team bets:</b> Admin → <i>Group bets: horse & odds</i>. Enter the Get Out horses and the odds you took for each team bet.</li>
+        <li><b>Feature:</b> tap <i>Lock feature votes</i> before 5:10, then enter both teams' odds.</li>
+        <li><b>Each result:</b> the race → Winner # (+ placed #s for each-way) → <b>Settle</b>. The board moves straight away. Re-settling is safe.</li>
+        <li><b>Quaddies:</b> after the last leg, enter the $ returned in <i>Quaddie returns</i> (0 if it missed).</li>
+        <li><b>Group P&L:</b> update the total $ returned from Sportsbet as you go.</li>
+      </ol></div>`:''}
+    <p class="tagline">Tip: Share → Add to Home Screen for the full-screen app.</p>
+  </div>`);
+  return v;
 }
 
 // ---------- games ----------
@@ -477,11 +605,14 @@ function quaddieLeg(q,race,legIndex){
     <div><label>Leg ${legIndex}</label><div class="small" style="font-weight:700">R${race.race_no}</div></div>
     <div>${rOpts}</div>
     <button class="btn sm save" ${locked?'disabled':''}>${mine?'✓':'Save'}</button></div>`);
+  const warn = mine && !locked && isScratched(race.id,mine.runner_number);
   if(!locked) row.querySelector('.save').onclick=async()=>{
+    if(await jumped(race)) return;
     const rn=(row.querySelector('.rn')||row.querySelector('.rn2')).value; if(!rn){alert('Pick a number');return;}
     const {error}=await sb.from('quaddie_entries').upsert({quaddie_id:q.id,player_id:S.me,leg_index:legIndex,runner_number:Number(rn)},{onConflict:'quaddie_id,player_id,leg_index'});
     if(error){alert(error.message);return;} await loadAll(); render();
   };
+  if(warn){ const w=el(`<div><div class="warn" style="margin-top:6px">⚠️ Leg ${legIndex}: #${mine.runner_number} was scratched — pick again.</div></div>`); w.appendChild(row); return w; }
   return row;
 }
 function renderFeature(box){
@@ -496,13 +627,18 @@ function renderFeature(box){
     <hr><div class="small">Your team (${me.gender==='M'?'👔 Guys':'👗 Girls'}) votes one horse — most votes runs.</div>
     <div class="fb"></div></div>`);
   const fb=card.querySelector('.fb');
-  if(pick && pick.locked){ fb.appendChild(el(`<div class="ok">Locked in: <b>#${pick.runner_number}</b> runs for the ${me.gender==='M'?'Guys':'Girls'}.</div>`)); }
+  const pickDead = !!(pick && pick.locked && isScratched(108,pick.runner_number));
+  const lockedLive = !!(pick && pick.locked && !pickDead);
+  if(pickDead) fb.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ Your team's horse #${pick.runner_number} was scratched — vote again, then an admin re-locks.</div>`));
+  if(myVote && !lockedLive && isScratched(108,myVote.runner_number)) fb.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ Your vote #${myVote.runner_number} was scratched — vote again.</div>`));
+  if(lockedLive){ fb.appendChild(el(`<div class="ok">Locked in: <b>#${pick.runner_number}</b> runs for the ${me.gender==='M'?'Guys':'Girls'}.</div>`)); }
   const rOpts = runners.length
     ? `<select class="rn"><option value="">Vote a runner…</option>${runners.map(r=>`<option value="${r.number}" ${myVote&&myVote.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
     : `<input class="rn2" type="number" inputmode="numeric" placeholder="Vote runner #" value="${myVote?myVote.runner_number||'':''}">`;
-  if(!(pick&&pick.locked)){
+  if(!lockedLive){
     const row=el(`<div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px"><div>${rOpts}</div><button class="btn sm save">Vote</button></div>`);
     row.querySelector('.save').onclick=async()=>{
+      if(await jumped(race||{id:108})) return;
       const rn=(row.querySelector('.rn')||row.querySelector('.rn2')).value; if(!rn){alert('Pick one');return;}
       const {error}=await sb.from('feature_votes').upsert({player_id:S.me,gender:me.gender,runner_number:Number(rn)},{onConflict:'player_id'});
       if(error){alert(error.message);return;} await loadAll(); render();
@@ -510,7 +646,7 @@ function renderFeature(box){
     fb.appendChild(row);
   }
   // tally
-  const votes=(S.data.feature_votes||[]).filter(v=>v.gender===me.gender);
+  const votes=(S.data.feature_votes||[]).filter(v=>v.gender===me.gender && !isScratched(108,v.runner_number));
   const tally={}; votes.forEach(v=>tally[v.runner_number]=(tally[v.runner_number]||0)+1);
   const trows=Object.entries(tally).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<div class="spread small"><span>#${n}</span><span class="mut">${c} vote${c>1?'s':''}</span></div>`).join('');
   if(trows) fb.appendChild(el(`<hr><div class="mut small">Your team's votes</div>${trows}`));
@@ -604,7 +740,8 @@ function adminRace(r){
     <div class="hint">Enter result → settles all bets on this race. Bets on scratched runners are refunded (0 pts).</div>
     <details class="fdet" ${S.openFields.has(r.id)?'open':''}><summary class="small" style="margin-top:6px">Field (${runners.length} runners${nScr?`, ${nScr} scratched`:''}) · load / scratch</summary>
       <div class="scr row" style="flex-wrap:wrap;gap:6px;margin:8px 0"></div>
-      <textarea class="fld" rows="4" placeholder="One runner per line, e.g.&#10;1 Horse Name&#10;2 Other Horse"></textarea>
+      <textarea class="fld" rows="4" placeholder="One runner per line, e.g.&#10;1 Horse Name&#10;2 Other Horse&#10;3 Scratched Horse SCR"></textarea>
+      <div class="hint pv"></div>
       <button class="btn sm sec loadf" style="margin-top:6px">Load / update field</button>
     </details></div>`);
   card.querySelector('.settle').onclick=()=>settleRace(r,card.querySelector('.win').value,card.querySelector('.plc').value);
@@ -613,24 +750,66 @@ function adminRace(r){
   runners.forEach(x=>{
     const b=el(`<button class="btn sm ${x.scratched?'':'sec'}" title="Tap to ${x.scratched?'un-scratch':'scratch'}">${x.scratched?'❌ ':''}#${x.number} ${esc(x.horse_name)}</button>`);
     b.onclick=async()=>{
-      if(!confirm(`${x.scratched?'Un-scratch':'Scratch'} #${x.number} ${x.horse_name}?`)) return;
+      const picks=picksOn(r.id,x.number);
+      if(!confirm(`${x.scratched?'Un-scratch':'Scratch'} #${x.number} ${x.horse_name}?${!x.scratched&&picks.length?`\n\n${picks.length} pick${picks.length>1?'s are':' is'} on it: ${picks.join(', ')}.\nThey'll see a "pick again" warning; bets left on it refund at settle.`:''}`)) return;
       const {error}=await sb.from('runners').update({scratched:!x.scratched}).eq('id',x.id);
       if(error){alert(error.message);return;} await loadAll(); render();
     };
     scr.appendChild(b);
   });
+  const fld=card.querySelector('.fld'), pv=card.querySelector('.pv');
+  fld.oninput=()=>{ const p=parseField(fld.value);
+    pv.innerHTML = p.length ? `Reads as ${p.length}: ${p.map(x=>`<b>${x.number}</b> ${esc(x.horse_name)}${x.scratched?' ❌':''}`).join(' · ')}`
+      : (fld.value.trim()?'<span class="neg">Nothing readable — start each line with the runner number.</span>':''); };
   card.querySelector('.loadf').onclick=async()=>{
-    const rows=parseField(card.querySelector('.fld').value).map(x=>({race_id:r.id,...x}));
-    if(!rows.length){ alert('No runners found. Use one per line: 1 Horse Name'); return; }
-    const {error}=await sb.from('runners').upsert(rows,{onConflict:'race_id,number'});
-    if(error){alert(error.message);return;} S.dirty=false; await loadAll(); render();
+    const parsed=parseField(fld.value);
+    if(!parsed.length){ alert('No runners found. Use one per line: 1 Horse Name'); return; }
+    // names only, so re-pasting a field never un-scratches anyone; SCR lines are scratched after
+    const {error}=await sb.from('runners').upsert(parsed.map(x=>({race_id:r.id,number:x.number,horse_name:x.horse_name})),{onConflict:'race_id,number'});
+    if(error){alert(error.message);return;}
+    const scr=parsed.filter(x=>x.scratched).map(x=>x.number);
+    if(scr.length){ const {error:e2}=await sb.from('runners').update({scratched:true}).eq('race_id',r.id).in('number',scr); if(e2) alert('Field loaded, but scratching failed: '+e2.message); }
+    S.dirty=false; await loadAll(); render();
   };
   return card;
 }
-// "1 Horse Name", "1. Horse", "1) Horse", "1 - Horse" → {number, horse_name}
+// Pasted field → [{number, horse_name, scratched}]. Accepts "1 Horse", "1. Horse", "1) Horse", "1 - Horse",
+// "1Horse(4)". Strips barriers "(4)" and weights "58.5kg"; skips jockey/trainer lines from a copied form guide;
+// "SCR"/"scratched" on a line marks it scratched. No numbers at all → numbered 1,2,3… in order.
+// Duplicate numbers keep the last line (a duplicate in one upsert makes Postgres reject the whole load).
 function parseField(text){
-  return (text||'').split(/\r?\n/).map(l=>l.match(/^\s*(\d{1,2})\s*[.)\-:]?\s+(.+?)\s*$/)).filter(Boolean)
-    .map(m=>({number:Number(m[1]),horse_name:m[2]}));
+  const lines=(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const re=/^(\d{1,2})(?:\s*[.):\-–]\s*|\s+|(?=[A-Za-z]))(.+)$/;
+  const anyNum=lines.some(l=>re.test(l));
+  const out=new Map(); let auto=0;
+  for(const l of lines){
+    let num,name; const m=l.match(re);
+    if(m){ num=Number(m[1]); name=m[2]; }
+    else if(!anyNum){ num=++auto; name=l; }
+    else continue;
+    if(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{2,4}\b/i.test(name)) continue; // "10 Nov 2026"
+    const scratched=/\b(scr|scratched)\b/i.test(name);
+    name=name.replace(/\b(scr|scratched)\b\.?/ig,' ')
+             .split(/\s*\(|\t|\s{2,}|\s+\d{2}(?:\.\d)?\s*kg\b/i)[0]
+             .replace(/[\s.\-–|]+$/,'').trim();
+    if(num>=1 && num<=30 && name) out.set(num,{number:num,horse_name:name,scratched});
+  }
+  return [...out.values()].sort((a,b)=>a.number-b.number);
+}
+function isScratched(raceId,num){ return (S.data.runners||[]).some(x=>x.race_id===raceId&&x.number===num&&x.scratched); }
+// Who has a pick on this runner — shown before scratching so admins know who to tell.
+function picksOn(raceId,num){
+  const pn=id=>{const p=(S.data.players||[]).find(p=>p.id===id);return p?p.display_name:'?';};
+  const out=[];
+  (S.data.bets||[]).filter(b=>b.race_id===raceId&&b.runner_number===num).forEach(b=>out.push(pn(b.player_id)+(b.bet_type==='pick_of_day'?' (POD)':'')));
+  (S.data.quaddie_entries||[]).forEach(e=>{ const q=(S.data.quaddies||[]).find(q=>q.id===e.quaddie_id);
+    if(q && (q.leg_race_ids||[])[e.leg_index-1]===raceId && e.runner_number===num) out.push(pn(e.player_id)+' (quaddie)'); });
+  if(raceId===108){
+    (S.data.feature_votes||[]).filter(v=>v.runner_number===num).forEach(v=>out.push(pn(v.player_id)+' (feature vote)'));
+    (S.data.feature_picks||[]).filter(p=>p.locked&&p.runner_number===num).forEach(p=>out.push((p.gender==='M'?'Guys':'Girls')+' feature pick'));
+  }
+  (S.data.group_bets||[]).filter(g=>g.category!=='feature'&&g.race_id===raceId&&g.runner_number===num).forEach(g=>out.push(g.label));
+  return out;
 }
 function groupBetEditor(g){
   const fp = g.category==='feature' ? (S.data.feature_picks||[]).find(p=>p.gender===g.gender_scope) : null;
@@ -653,6 +832,7 @@ function groupBetEditor(g){
 // ---- admin actions ----
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 async function drawPod(){
+  await loadAll(); // the admin phone may have slept and missed live updates
   // 8 nominated races, assign each of 8 boys to one race, each of 8 girls to one race (random)
   if((S.data.pod_assignments||[]).length && !confirm('Already drawn. Re-draw Pick of the Day? Everyone gets a new race, and any POD bets already placed stay on the old race.')) return;
   const noms=(S.data.races||[]).filter(r=>r.pod_nominated).sort((a,b)=>a.sort_order-b.sort_order);
@@ -665,6 +845,7 @@ async function drawPod(){
   msg(error?('Error: '+error.message):'Pick-of-the-Day races drawn ✓'); await loadAll(); render();
 }
 async function drawQuaddieSplits(){
+  await loadAll(); // the admin phone may have slept and missed live updates
   if((S.data.quaddie_groups||[]).length && !confirm('Already drawn. Re-draw the Flem quaddie splits? Picks already entered stay on their old legs.')) return;
   const rows=[];
   for(const q of (S.data.quaddies||[]).filter(q=>q.style==='split')){
@@ -675,8 +856,9 @@ async function drawQuaddieSplits(){
   msg(error?('Error: '+error.message):'Flem quaddie splits drawn ✓'); await loadAll(); render();
 }
 async function lockFeature(){
+  await loadAll(); // the admin phone may have slept and missed live updates
   for(const g of ['M','F']){
-    const votes=(S.data.feature_votes||[]).filter(v=>v.gender===g);
+    const votes=(S.data.feature_votes||[]).filter(v=>v.gender===g && !isScratched(108,v.runner_number)); // scratched horses can't run
     if(!votes.length) continue;
     const tally={}; votes.forEach(v=>tally[v.runner_number]=(tally[v.runner_number]||0)+1);
     const win=Object.entries(tally).sort((a,b)=>b[1]-a[1])[0][0];
@@ -697,72 +879,156 @@ async function spinMystery(m){
   if(error){ alert(error.message); return; }
   msg(`🎡 ${m.label}: R${race.race_no} ${race.name} → #${rn}`); await loadAll(); render();
 }
+// ---------- the Mystery wheel, live on every phone ----------
+// The admin's phone drives the spin and broadcasts each step (open → spin to angle T → reveal) over
+// Supabase Realtime broadcast — no DB rows. Every other phone builds the same wheel and animates to the
+// same angle, so the whole squad watches it land together. The result is still saved to group_bets,
+// so anyone who missed it sees it in Games → Mysteries.
+const WHEEL_EVENT='w';
+let wheelCh=null;
+function wheelBus(){ return window.__wheelBus || { send:p=>wheelCh&&wheelCh.send({type:'broadcast',event:WHEEL_EVENT,payload:p}).catch(()=>{}) }; }
+function wheelSend(p){ try{ wheelBus().send(p); }catch(e){} }
+function wheelOverlay(label,sub){
+  document.querySelectorAll('.wheelwrap').forEach(x=>x.remove());
+  const ov=el(`<div class="wheelwrap">
+    <div style="font-size:13px;color:var(--mut)">🎡 ${esc(label)}</div>
+    <div class="small wsub" style="color:var(--gold2);margin-top:4px">${esc(sub||'')}</div>
+    <div class="wtitle"></div>
+    <div class="wst"></div>
+    <div class="wctrl" style="margin-top:14px"></div>
+    <button class="btn sec sm wclose" style="margin-top:16px">Close</button></div>`);
+  document.body.appendChild(ov);
+  return {ov, sub:ov.querySelector('.wsub'), wt:ov.querySelector('.wtitle'), stage:ov.querySelector('.wst'), ctrl:ov.querySelector('.wctrl'), close:ov.querySelector('.wclose')};
+}
+function buildWheel(stage,labels){
+  const N=labels.length, seg=360/N;
+  const cols=['#0f5138','#124031','#1a5a3f','#0c3f2d'];
+  const stops=labels.map((_,i)=>`${cols[i%cols.length]} ${i*seg}deg ${(i+1)*seg}deg`).join(',');
+  stage.innerHTML='';
+  const wrap=el(`<div class="wheelstage"><div class="wpointer"></div><div class="wheel"></div><div class="whub">🐎</div></div>`);
+  const wheel=wrap.querySelector('.wheel');
+  wheel.style.background=`conic-gradient(${stops})`;
+  labels.forEach((t,i)=>{
+    const lab=el(`<div class="lab">${esc(t)}</div>`);
+    lab.style.transform=`translate(-50%,-50%) rotate(${i*seg+seg/2}deg) translateY(-116px)`;
+    wheel.appendChild(lab);
+  });
+  stage.appendChild(wrap);
+  return wheel;
+}
+// random segment + final angle (fresh wheel starts at 0°, so ≥6 full turns then land on segment i)
+function pickTarget(N){
+  const seg=360/N, i=Math.floor(Math.random()*N), center=i*seg+seg/2;
+  return { i, T: ((360-center)%360) + (Math.random()-0.5)*seg*0.5 + 6*360 };
+}
+function spinTo(wheel,T){
+  return new Promise(res=>{
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ wheel.style.transform=`rotate(${T}deg)`; }));
+    let done=false; const f=()=>{ if(done) return; done=true; res(); };
+    wheel.addEventListener('transitionend',f,{once:true}); setTimeout(f,5600);
+  });
+}
+function waitSpinTap(ctrl){
+  return new Promise(res=>{
+    ctrl.innerHTML='';
+    const b=el(`<button class="btn" style="font-size:18px;padding:14px 30px">🎡 SPIN</button>`);
+    b.onclick=()=>{ b.disabled=true; res(); };
+    ctrl.appendChild(b);
+  });
+}
+function revealHtml(p){
+  return `<div class="bigreveal">${esc(p.label)}<br><b>R${esc(p.raceNo)} ${esc(p.raceName)}</b><br>→ <b style="font-size:30px;color:var(--gold)">#${esc(p.rn)}</b>${p.horse?`<br><span style="font-size:18px">${esc(p.horse)}</span>`:''}</div>`;
+}
+
+// Admin: drive the spin
 async function openMysteryWheel(m){
   if(m.race_id && !confirm(`Re-spin ${m.label}? It's already on R${raceById(m.race_id)?.race_no} #${m.runner_number}.`)) return;
+  await loadAll();
   // same rule as spinMystery: only races still open for betting that have a field loaded
   const live=r=>(S.data.runners||[]).filter(x=>x.race_id===r.id&&!x.scratched);
   const races=(S.data.races||[]).filter(r=>r.track===m.track && !isLocked(r) && live(r).length).sort((a,b)=>a.sort_order-b.sort_order);
   if(!races.length){ alert(`No open ${m.track} race with a field loaded. Load runners first.`); return; }
-  const ov=el(`<div class="wheelwrap">
-    <div style="font-size:13px;color:var(--mut)">🎡 ${esc(m.label)}</div>
-    <div class="wtitle" id="wtitle"></div>
-    <div id="stage"></div>
-    <div id="ctrl" style="margin-top:14px"></div>
-    <button class="btn sec sm" id="wclose" style="margin-top:16px">Close</button></div>`);
-  document.body.appendChild(ov);
-  ov.querySelector('#wclose').onclick=()=>ov.remove();
-  const stage=ov.querySelector('#stage'), ctrl=ov.querySelector('#ctrl'), wt=ov.querySelector('#wtitle');
-  wt.textContent='Spin 1 — the RACE';
-  const ri=await wheelSpin(stage,ctrl,races.map(r=>'R'+r.race_no));
-  const race=races[ri];
-  wt.textContent='Spin 2 — the HORSE · R'+race.race_no;
-  const nums=live(race).sort((a,b)=>a.number-b.number).map(r=>r.number);
-  const hi=await wheelSpin(stage,ctrl,nums.map(n=>'#'+n));
-  const rn=nums[hi];
-  const {error}=await sb.from('group_bets').update({race_id:race.id,runner_number:rn,odds:null}).eq('id',m.id);
-  if(error){ alert(error.message); ov.remove(); return; }
-  wt.textContent='🥂 Locked in!';
-  stage.innerHTML=`<div class="bigreveal">${esc(m.label)}<br><b>R${race.race_no} ${esc(race.name)}</b><br>→ <b style="font-size:30px;color:var(--gold)">#${rn}</b></div>`;
-  ctrl.innerHTML='';
-  const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=async()=>{ov.remove();await loadAll();render();}; ctrl.appendChild(d);
+  const by=(myPlayer()||{}).display_name||'Admin';
+  const W=wheelOverlay(m.label,'📡 Live on every phone');
+  let saved=false;
+  W.close.onclick=()=>{ W.ov.remove(); if(!saved) wheelSend({t:'close',label:m.label}); };
+  // spin 1 — the race
+  const raceLabels=races.map(r=>'R'+r.race_no);
+  const t1='Spin 1 — the RACE';
+  W.wt.textContent=t1;
+  let wheel=buildWheel(W.stage,raceLabels);
+  wheelSend({t:'open',label:m.label,by,stage:1,title:t1,labels:raceLabels});
+  await waitSpinTap(W.ctrl);
+  let pick=pickTarget(raceLabels.length);
+  wheelSend({t:'spin',stage:1,T:pick.T});
+  W.ctrl.innerHTML='<div class="count">Spinning…</div>';
+  await spinTo(wheel,pick.T);
+  if(!document.body.contains(W.ov)) return;
+  const race=races[pick.i];
+  // spin 2 — the horse
+  const field=live(race).sort((a,b)=>a.number-b.number);
+  const horseLabels=field.map(r=>'#'+r.number);
+  const t2=`Spin 2 — the HORSE · R${race.race_no} ${race.track.slice(0,4)}`;
+  const landed=`R${race.race_no} ${race.name}`;
+  W.wt.textContent=t2; W.sub.textContent='Race: '+landed;
+  wheel=buildWheel(W.stage,horseLabels);
+  wheelSend({t:'open',label:m.label,by,stage:2,title:t2,labels:horseLabels,landed});
+  await waitSpinTap(W.ctrl);
+  pick=pickTarget(horseLabels.length);
+  wheelSend({t:'spin',stage:2,T:pick.T});
+  W.ctrl.innerHTML='<div class="count">Spinning…</div>';
+  await spinTo(wheel,pick.T);
+  if(!document.body.contains(W.ov)) return;
+  const runner=field[pick.i];
+  const {error}=await sb.from('group_bets').update({race_id:race.id,runner_number:runner.number,odds:null}).eq('id',m.id);
+  if(error){ alert(error.message); wheelSend({t:'close',label:m.label}); W.ov.remove(); return; }
+  saved=true;
+  const rv={label:m.label,raceNo:race.race_no,raceName:race.name,rn:runner.number,horse:runner.horse_name};
+  wheelSend({t:'reveal',...rv});
+  W.wt.textContent='🥂 Locked in!';
+  W.stage.innerHTML=revealHtml(rv);
+  W.ctrl.innerHTML='';
+  const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=async()=>{W.ov.remove();await loadAll();render();}; W.ctrl.appendChild(d);
 }
-function wheelSpin(stage,ctrl,labels){
-  return new Promise(resolve=>{
-    const N=labels.length, seg=360/N;
-    const cols=['#0f5138','#124031','#1a5a3f','#0c3f2d'];
-    const stops=labels.map((_,i)=>`${cols[i%cols.length]} ${i*seg}deg ${(i+1)*seg}deg`).join(',');
-    stage.innerHTML='';
-    const wrap=el(`<div class="wheelstage"><div class="wpointer"></div><div class="wheel"></div><div class="whub">🐎</div></div>`);
-    const wheel=wrap.querySelector('.wheel');
-    wheel.style.background=`conic-gradient(${stops})`;
-    labels.forEach((t,i)=>{
-      const c=i*seg+seg/2;
-      const lab=el(`<div class="lab">${esc(t)}</div>`);
-      lab.style.transform=`translate(-50%,-50%) rotate(${c}deg) translateY(-116px)`;
-      wheel.appendChild(lab);
+
+// Everyone else: watch the admin's spin
+const WV={W:null,wheel:null,anim:Promise.resolve(),dismissed:null};
+function onWheelMsg(p){
+  if(!p || !S.me) return;
+  const open=()=>WV.W && document.body.contains(WV.W.ov);
+  if(p.t==='open'){
+    if(p.stage===1) WV.dismissed=null;
+    if(WV.dismissed===p.label) return;          // they closed it — don't keep popping it back up
+    if(!open()){
+      WV.W=wheelOverlay(p.label,`📡 ${p.by} is spinning live`);
+      WV.W.close.onclick=()=>{ WV.dismissed=WV.W.ov.dataset.label; WV.W.ov.remove(); };
+    }
+    WV.W.ov.dataset.label=p.label;
+    WV.W.wt.textContent=p.title;
+    if(p.landed) WV.W.sub.textContent='Race: '+p.landed;
+    WV.wheel=buildWheel(WV.W.stage,p.labels);
+    WV.W.ctrl.innerHTML=`<div class="mut small">Waiting for ${esc(p.by)} to spin…</div>`;
+  } else if(p.t==='spin'){
+    if(!open()||!WV.wheel) return;
+    WV.W.ctrl.innerHTML='<div class="count">Spinning…</div>';
+    WV.anim=spinTo(WV.wheel,p.T);
+  } else if(p.t==='reveal'){
+    if(!open()) return;
+    const W=WV.W;
+    WV.anim.then(()=>{
+      if(!document.body.contains(W.ov)) return;
+      W.wt.textContent='🥂 Locked in!';
+      W.stage.innerHTML=revealHtml(p);
+      W.ctrl.innerHTML='';
+      const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=()=>W.ov.remove(); W.ctrl.appendChild(d);
     });
-    stage.appendChild(wrap);
-    ctrl.innerHTML='';
-    const btn=el(`<button class="btn" style="font-size:18px;padding:14px 30px">🎡 SPIN</button>`);
-    ctrl.appendChild(btn);
-    let cur=0;
-    btn.onclick=()=>{
-      btn.disabled=true;
-      const i=Math.floor(Math.random()*N);
-      const center=i*seg+seg/2;
-      const want=((360-center)%360)+(Math.random()-0.5)*seg*0.5;
-      let T=cur-(cur%360)+want+6*360;
-      if(T<=cur+360) T+=360;
-      cur=T;
-      requestAnimationFrame(()=>{wheel.style.transform=`rotate(${T}deg)`;});
-      let done=false; const finish=()=>{if(done)return;done=true;resolve(i);};
-      wheel.addEventListener('transitionend',finish,{once:true});
-      setTimeout(finish,5600);
-    };
-  });
+  } else if(p.t==='close'){
+    if(open()){ WV.W.wt.textContent='Spin cancelled'; WV.W.ctrl.innerHTML=''; setTimeout(()=>{ if(open()) WV.W.ov.remove(); },1500); }
+  }
 }
 async function settleRace(r,winStr,plcStr){
   const win=Number(winStr); if(!win){alert('Enter winner #');return;}
+  await loadAll(); // settle every bet in the DB, including ones this phone never received live
   const places=(plcStr||'').split(',').map(s=>Number(s.trim())).filter(Boolean);
   const {error:re}=await sb.from('races').update({status:'resulted',result_win:win,result_places:places,resulted_at:new Date().toISOString()}).eq('id',r.id);
   if(re){ alert('Could not save result: '+re.message); return; }
@@ -823,6 +1089,9 @@ async function boot(){
   sb.channel('qs').on('postgres_changes',{event:'*',schema:'public'},()=>{
     clearTimeout(t); t=setTimeout(async()=>{ await loadAll(); liveRender(); },400);
   }).subscribe();
+  // live Mystery wheel (broadcast only — the admin's own phone doesn't receive its own messages)
+  if(window.__wheelBus) window.__wheelBus.listen(onWheelMsg);
+  else wheelCh=sb.channel('qs-wheel',{config:{broadcast:{self:false}}}).on('broadcast',{event:WHEEL_EVENT},({payload})=>onWheelMsg(payload)).subscribe();
 }
 boot().catch(e=>{ $('#app').innerHTML=`<div class="wrap"><div class="card warn">Load error: ${esc(e.message)}<br><br>If this is the first run, the database tables may not be applied yet.</div></div>`; });
 </script>
