@@ -1,0 +1,12 @@
+{
+  "name": "quad-squad-steaks-day",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Quad Squad — Steaks Day 2026 betting app",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
