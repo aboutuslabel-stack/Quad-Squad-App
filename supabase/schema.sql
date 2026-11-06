@@ -161,6 +161,11 @@ begin
       feature_picks, feature_votes, players, pod_assignments;
   exception when duplicate_object then null;
   end;
+  -- settings carries Group P&L + quaddie returns, which must push live too
+  begin
+    alter publication supabase_realtime add table settings;
+  exception when duplicate_object then null;
+  end;
 end $$;
 
 -- ======================================================================
