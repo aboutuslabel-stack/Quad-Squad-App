@@ -58,7 +58,7 @@
   .tab.on{background:var(--gold);color:#201700;border-color:var(--gold)}
   .nav{position:fixed;left:0;right:0;bottom:0;background:#061c15;border-top:1px solid var(--line);z-index:30;padding-bottom:env(safe-area-inset-bottom)}
   .nav .inner{max-width:560px;margin:0 auto;display:flex}
-  .nav a{flex:1;text-align:center;padding:10px 2px 8px;color:var(--mut);font-size:10.5px;text-decoration:none;font-weight:600}
+  .nav a{flex:1;text-align:center;padding:10px 1px 8px;color:var(--mut);font-size:10px;text-decoration:none;font-weight:600;white-space:nowrap}
   .nav a.on{color:var(--gold)}
   .nav .ic{display:block;font-size:19px;line-height:1}
   .avatar{width:38px;height:38px;border-radius:50%;background:var(--card2);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--gold2);overflow:hidden;flex:0 0 auto;border:1px solid var(--line)}
@@ -72,6 +72,13 @@
   .race{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
   .race .tno{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto}
   .race .flem{background:rgba(47,111,176,.22);color:#bcd7f2}
+  .wheel .lab.radial{font-size:11px;max-width:98px;overflow:hidden;text-overflow:ellipsis}
+  .closebar{border-radius:12px;padding:10px 12px;font-size:13px;margin:12px 0;border:1px solid var(--line)}
+  .closebar.open{background:rgba(228,184,74,.14);border-color:rgba(228,184,74,.45);color:var(--gold2)}
+  .closebar.shut{background:#1b2a24;color:#cfe}
+  .slip{display:grid;grid-template-columns:1fr 74px auto;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .slip input{padding:7px;font-size:16px}
+  .chiprow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
   .reps{margin-top:6px;display:grid;gap:3px}
   .reps div{font-size:12px;color:#cfe0d8;line-height:1.35}
   .reps .me{color:var(--gold);font-weight:800}
@@ -114,6 +121,7 @@
     <a data-view="races"><span class="ic">🐎</span>Races</a>
     <a data-view="bets"><span class="ic">🎰</span>My Bets</a>
     <a data-view="games"><span class="ic">🎲</span>Games</a>
+    <a data-view="wheel"><span class="ic">🎡</span>Wheel</a>
     <a data-view="rules"><span class="ic">📖</span>Rules</a>
     <a data-view="admin" id="navAdmin" style="display:none"><span class="ic">🛠️</span>Admin</a>
   </div>
@@ -145,11 +153,27 @@ async function loadAll(){
 function raceById(id){ return (S.data.races||[]).find(r=>r.id===id); }
 function myPlayer(){ return (S.data.players||[]).find(p=>p.id===S.me); }
 function isLocked(r){ if(!r) return true; if(r.status!=='upcoming') return true; return r.jump_time && new Date(r.jump_time) <= new Date(); }
+// All picks close at one time (default 2:00pm) so the admins can put the real bets on Sportsbet.
+// Admins can still edit after the close; everyone else is locked. Races also lock at their own jump.
+const DEFAULT_CLOSE='2026-11-07T14:00:00+11:00';
+function betsCloseAt(){ const s=(S.data.settings||[]).find(s=>s.key==='bets_close'); return new Date((s&&s.value&&s.value.at)||DEFAULT_CLOSE); }
+function picksClosed(){ return new Date()>=betsCloseAt(); }
+function isAdminMe(){ const p=myPlayer(); return !!(p&&p.is_admin); }
+function pickLocked(r){ return isLocked(r) || (picksClosed() && !isAdminMe()); }
+function adminNames(){ return (S.data.players||[]).filter(p=>p.is_admin).map(p=>p.display_name).join(' & ')||'the admins'; }
+function closeBar(){
+  const at=betsCloseAt(), t=melbTime(at.toISOString());
+  if(picksClosed()) return `<div class="closebar shut">🔒 <b>Picks closed at ${t}.</b> ${esc(adminNames())} are putting the bets on, and your odds show on each bet once it's on.</div>`;
+  const mins=Math.max(0,Math.round((at-new Date())/60000)), h=Math.floor(mins/60), m=mins%60;
+  return `<div class="closebar open">⏰ <b>All picks close at ${t}</b> (${h?h+'h ':''}${m}m to go) so ${esc(adminNames())} can put them on. No odds needed: just pick your horses.</div>`;
+}
 function melbTime(iso){ try{return new Date(iso).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:'Australia/Melbourne'});}catch(e){return '';} }
 
 // ---------- scoring ----------
+// Personal boards (Players, Couples, Mug) = your 5 bets + Pick of the Day. Group picks only count for Guys v Girls.
+const PERSONAL=b=>b.bet_type!=='group_pick';
 function playerPoints(pid){
-  return (S.data.bets||[]).filter(b=>b.player_id===pid).reduce((a,b)=>a+Number(b.points||0),0);
+  return (S.data.bets||[]).filter(b=>b.player_id===pid&&PERSONAL(b)).reduce((a,b)=>a+Number(b.points||0),0);
 }
 function genderPoints(g){
   const ids = (S.data.players||[]).filter(p=>p.gender===g).map(p=>p.id);
@@ -183,7 +207,7 @@ function quaddieLanded(q){
 function anyResulted(){ return (S.data.races||[]).some(r=>r.status==='resulted'); }
 function couplePoints(cid){
   const ids = (S.data.players||[]).filter(p=>p.couple_id===cid).map(p=>p.id);
-  return (S.data.bets||[]).filter(b=>ids.includes(b.player_id)).reduce((a,b)=>a+Number(b.points||0),0);
+  return (S.data.bets||[]).filter(b=>ids.includes(b.player_id)&&PERSONAL(b)).reduce((a,b)=>a+Number(b.points||0),0);
 }
 function groupPnl(){
   const st = (S.data.settings||[]).find(s=>s.key==='pnl'); const v = st? st.value : {staked:2000,returned:0};
@@ -199,7 +223,7 @@ function render(){
   $('#navAdmin').style.display = (me && me.is_admin)?'':'none';
   document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('on',a.dataset.view===S.view));
   const app = $('#app');
-  const views = {home:renderHome, races:renderRaces, bets:renderBets, games:renderGames, rules:renderRules, admin:renderAdmin};
+  const views = {home:renderHome, races:renderRaces, bets:renderBets, games:renderGames, wheel:renderWheel, rules:renderRules, admin:renderAdmin};
   const y = window.scrollY;
   app.innerHTML = '';
   app.appendChild((views[S.view]||renderHome)());
@@ -268,6 +292,7 @@ function renderHome(){
     <div class="hero"><img src="assets/hero-finish.webp" alt=""><div class="ov"></div>
       <div class="ttl"><div class="k">The Quad Squad</div><div class="b">STEAKS DAY <em>2026</em></div></div></div>
     <div class="wrap">
+      ${closeBar()}
       <div class="card">
         <div class="spread"><div><div class="mut small">GROUP P&L · real $ on Sportsbet</div>
           <div style="font-size:26px;font-weight:800" class="${net>=0?'pos':'neg'}">${net>=0?'+':''}${money(net)}</div></div>
@@ -325,7 +350,7 @@ function renderBoard(box){
 function coupleLabel(cid){const c=(S.data.couples||[]).find(c=>c.id===cid);return c?c.label:'';}
 
 // ---------- races ----------
-// Who is repping this race: Pick-of-the-Day pair, quaddie legs, feature, get-out and any mystery that landed here.
+// Who is repping this race: group-pick pair, quaddie legs, feature, get-out and any mystery that landed here.
 function raceReps(r){
   const P=id=>(S.data.players||[]).find(p=>p.id===id);
   const nm=p=>p?`<span class="${p.id===S.me?'me':''}">${esc(p.id===S.me?'You':p.display_name)}</span>`:'?';
@@ -333,7 +358,7 @@ function raceReps(r){
   const pod=(S.data.pod_assignments||[]).filter(a=>a.race_id===r.id).map(a=>P(a.player_id)).filter(Boolean);
   if(pod.length){
     const m=pod.filter(p=>p.gender==='M'), f=pod.filter(p=>p.gender==='F');
-    out.push(`🎯 Pick of the Day: 👔 ${m.map(nm).join(', ')||'—'} <span class="mut">v</span> 👗 ${f.map(nm).join(', ')||'—'}`);
+    out.push(`👥 Group pick: 👔 ${m.map(nm).join(', ')||'—'} <span class="mut">v</span> 👗 ${f.map(nm).join(', ')||'—'}`);
   }
   (S.data.quaddies||[]).forEach(q=>{
     const li=(q.leg_race_ids||[]).indexOf(r.id); if(li<0) return;
@@ -400,43 +425,63 @@ function myQuaddieLegRaces(){
 async function jumped(race){
   await loadAll();
   if(isLocked(raceById(race.id))){ alert('This race has jumped — picks are locked.'); render(); return true; }
+  if(picksClosed() && !isAdminMe()){ alert(`Picks closed at ${melbTime(betsCloseAt().toISOString())} so ${adminNames()} can put the bets on. Ask them if you need a change.`); render(); return true; }
   return false;
 }
 function myBet(raceId,type){ return (S.data.bets||[]).find(b=>b.player_id===S.me&&b.race_id===raceId&&b.bet_type===type); }
+let podPick=null; // race chosen in the Pick-of-the-Day race picker (before a bet exists)
 function renderBets(){
   const me=myPlayer();
-  const pod=myPodRace();
+  const grp=myPodRace();                       // drawn group-pick race
   const myInd=(S.data.bets||[]).filter(b=>b.player_id===S.me&&b.bet_type==='individual');
+  const myPod=(S.data.bets||[]).find(b=>b.player_id===S.me&&b.bet_type==='pick_of_day');
+  const team=me&&me.gender==='M'?'👔 Guys':'👗 Girls';
   const v=el(`<div class="wrap"><h2 style="margin-top:14px">🎰 My Bets</h2>
-    <p class="hint">5 bets @ $10 (your picks) + 1 Pick of the Day @ $25. Enter the odds you take on Sportsbet.</p>
-    <div class="card"><div class="spread"><b>Pick of the Day ·  $25 · ×2 pts</b><span class="pill g">DOUBLE</span></div>
+    ${closeBar()}
+    <p class="hint">Your group pick for the ${team} ($25) · your own Pick of the Day ($25, double points) · 5 bets @ $10.</p>
+    <div class="card"><div class="spread"><b>👥 Group pick · $25 · for the ${team}</b><span class="pill ${me&&me.gender==='M'?'blue':'rose'}">TEAM</span></div>
+      <div class="hint">Your drawn race: pick one horse for your team. It's 👔 v 👗 in every race, and it counts on the Guys v Girls board.</div>
+      <div id="grpbox"></div></div>
+    <div class="card"><div class="spread"><b>🎯 Pick of the Day · $25 · ×2 pts</b><span class="pill g">DOUBLE</span></div>
+      <div class="hint">Your best bet of the day: any race, any horse. A bit more on it, and double points on your own board.</div>
       <div id="podbox"></div></div>
     <div class="spread" style="margin:10px 2px"><b>Your 5 bets</b><span class="mut small">${myInd.length}/5 placed</span></div>
     <div id="indbox"></div>
     </div>`);
-  // POD
-  const podbox=v.querySelector('#podbox');
-  if(!pod){ podbox.appendChild(el(`<div class="hint">Your Pick-of-the-Day race hasn't been drawn yet — the admin runs the draw before 2:30.</div>`)); }
-  else { podbox.appendChild(betEditor(pod,'pick_of_day',25)); }
-  // individual
-  const indbox=v.querySelector('#indbox');
-  const excl=myQuaddieLegRaces(); if(pod) excl.add(pod.id);
   const races=(S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
+  const rep=myQuaddieLegRaces(); if(grp) rep.add(grp.id);   // races you're repping the group in
+  // group pick
+  const grpbox=v.querySelector('#grpbox');
+  if(!grp) grpbox.appendChild(el(`<div class="hint">Not drawn yet. The admin runs the draw before 2:30.</div>`));
+  else grpbox.appendChild(betEditor(grp,'group_pick',25));
+  // pick of the day: choose the race, then the horse
+  const podbox=v.querySelector('#podbox');
+  const podRace = podPick ? raceById(podPick) : (myPod ? raceById(myPod.race_id) : null);  // the race you just chose wins
+  const podOk=r=>!rep.has(r.id) && !pickLocked(r) && !myInd.some(b=>b.race_id===r.id);
+  if(!(myPod && pickLocked(raceById(myPod.race_id))) && !(picksClosed() && !isAdminMe() && !myPod)){
+    const opts=races.filter(r=>podOk(r)||(podRace&&r.id===podRace.id));
+    const sel=el(`<div style="margin-top:8px"><label>Race</label><select class="podrace"><option value="">Choose your race…</option>${opts.map(r=>`<option value="${r.id}" ${podRace&&podRace.id===r.id?'selected':''}>${melbTime(r.jump_time)} · R${r.race_no} ${esc(r.track.slice(0,4))} · ${esc(r.name)}</option>`).join('')}</select></div>`);
+    sel.querySelector('select').onchange=e=>{ podPick=Number(e.target.value)||null; S.dirty=false; render(); };
+    podbox.appendChild(sel);
+  }
+  if(podRace) podbox.appendChild(betEditor(podRace,'pick_of_day',25));
+  // 5 individual bets
+  const indbox=v.querySelector('#indbox');
   races.forEach(r=>{
     const mine=myBet(r.id,'individual');
-    const blocked=excl.has(r.id);
-    if(blocked && !mine){ return; } // hide no-double-dip races
-    indbox.appendChild(betEditor(r,'individual',10, blocked));
+    if(rep.has(r.id) && !mine) return;                        // no double-dipping: hidden
+    if(!mine && ((podRace && r.id===podRace.id) || (myPod && r.id===myPod.race_id))) return;   // that's your Pick of the Day race
+    indbox.appendChild(betEditor(r,'individual',10, rep.has(r.id)));
   });
   return v;
 }
 function betEditor(race,type,stake,blocked){
   const mine=myBet(race.id,type);
-  const locked=isLocked(race);
+  const locked=pickLocked(race);
   const runners=(S.data.runners||[]).filter(x=>x.race_id===race.id && !x.scratched).sort((a,b)=>a.number-b.number);
   const box=el(`<div class="card"><div class="spread">
       <div><b>${esc(race.name)}</b> <span class="pill ${race.track==='Flemington'?'blue':'g'}">R${race.race_no} ${race.track.slice(0,4)}</span>
-      <div class="mut small">${melbTime(race.jump_time)} · $${stake}${type==='pick_of_day'?' · your assigned race':''}</div></div>
+      <div class="mut small">${melbTime(race.jump_time)} · $${stake}${type==='group_pick'?' · your drawn race':type==='pick_of_day'?' · your Pick of the Day':''}</div></div>
       <div>${locked?'<span class="pill lock">LOCKED</span>':''}</div></div>`);
   if(blocked){ box.appendChild(el(`<div class="hint">You're repping the group here — no double-dipping.</div>`)); return box; }
   if(mine && !locked && isScratched(race.id,mine.runner_number)) box.appendChild(el(`<div class="warn" style="margin-top:6px">⚠️ #${mine.runner_number} ${esc(mine.horse_name||'')} was scratched — pick again (it refunds if you leave it).</div>`));
@@ -447,27 +492,125 @@ function betEditor(race,type,stake,blocked){
   const rOpts = runners.length
     ? `<select class="rn"><option value="">Pick a runner…</option>${runners.map(r=>`<option value="${r.number}" ${mine&&mine.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
     : `<input class="rn2" type="number" inputmode="numeric" placeholder="Runner # (fields TBD)" value="${mine?mine.runner_number||'':''}">`;
-  const ed=el(`<div class="grid" style="grid-template-columns:1fr 90px auto;align-items:end;margin-top:8px">
+  const ed=el(`<div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px">
     <div><label>Runner</label>${rOpts}</div>
-    <div><label>Odds</label><input class="od" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 4.5" value="${mine?mine.odds||'':''}"></div>
-    <button class="btn sm save">${mine?'Update':'Place'}</button></div>`);
+    <button class="btn sm save">${mine?'Update':'Pick'}</button></div>`);
   box.appendChild(ed);
+  if(mine) box.appendChild(el(`<div class="small" style="margin-top:6px">${mine.odds?`✅ On at <b>$${mine.odds}</b>`:`<span class="mut">✓ Picked #${mine.runner_number} ${esc(mine.horse_name||'')}. The odds show here once it's on.</span>`}</div>`));
   ed.querySelector('.save').onclick=async()=>{
     if(await jumped(race)) return;
     const rn = (ed.querySelector('.rn')||ed.querySelector('.rn2')).value;
-    const od = ed.querySelector('.od').value;
     if(!rn){ alert('Pick a runner'); return; }
-    if(!(Number(od)>1)){ alert('Enter the Sportsbet odds you took (e.g. 4.50)'); return; }
     if(type==='individual' && !mine && (S.data.bets||[]).filter(b=>b.player_id===S.me&&b.bet_type==='individual').length>=5){
       alert('You already have 5 bets. Update one of them instead.'); return; }
     const runnerObj=runners.find(r=>r.number==rn);
     const rec={ player_id:S.me, race_id:race.id, bet_type:type, runner_number:Number(rn),
-      horse_name:runnerObj?runnerObj.horse_name:null, stake:stake, odds:Number(od), status:'open' };
+      horse_name:runnerObj?runnerObj.horse_name:null, stake:stake, status:'open' };
+    if(!mine || mine.runner_number!==Number(rn)) rec.odds=null;   // a changed horse needs putting on again
     const {error}=await sb.from('bets').upsert(rec,{onConflict:'player_id,race_id,bet_type'});
     if(error){ alert('Error: '+error.message); return; }
+    if(type==='pick_of_day'){ await sb.from('bets').delete().eq('player_id',S.me).eq('bet_type','pick_of_day').neq('race_id',race.id); podPick=null; }
     await loadAll(); render();
   };
   return box;
+}
+
+// ---------- 🎡 Wheel tab: Mysteries (admin spins) + fun wheels (anyone adds & spins), all live ----------
+function funWheels(){ const s=(S.data.settings||[]).find(s=>s.key==='fun_wheels'); return (s&&s.value&&s.value.list)||[]; }
+async function saveFunWheels(fn){
+  await loadAll();
+  const next=fn(funWheels());
+  const {error}=await sb.from('settings').upsert({key:'fun_wheels',value:{list:next}},{onConflict:'key'});
+  if(error){ alert('Error: '+error.message); return false; }
+  await loadAll(); return true;
+}
+let fwDraft={title:'',opts:''};
+function renderWheel(){
+  const me=myPlayer()||{};
+  const v=el(`<div class="wrap"><h2 style="margin-top:14px">🎡 The Wheel</h2>
+    <p class="hint">Every spin plays live on everyone's phone.</p>
+    <h3 style="margin:14px 0 4px">🎲 Mysteries</h3>
+    <div class="hint">Spin 1 picks the race, spin 2 picks the horse. ${esc(adminNames())} spin these.</div>
+    <div id="myst"></div>
+    <h3 style="margin:18px 0 4px">🍻 Fun wheels</h3>
+    <div class="hint">Who's buying the next round? Who has to go to the bar? Make a wheel and spin it.</div>
+    <div id="fun"></div>
+    <div class="card"><b>＋ New wheel</b>
+      <div style="margin-top:8px"><label>Question</label><input class="fwt" placeholder="Who's getting this round? (Boys)" value="${esc(fwDraft.title)}"></div>
+      <div class="chiprow">
+        <button class="btn sec sm" data-p="M">👔 Boys</button><button class="btn sec sm" data-p="F">👗 Girls</button>
+        <button class="btn sec sm" data-p="ALL">Everyone</button><button class="btn sec sm" data-p="C">Couples</button>
+        <button class="btn sec sm" data-p="X">Clear</button></div>
+      <label>Options, one per line</label><textarea class="fwo" style="min-height:110px" placeholder="Liam&#10;Dane&#10;Tim">${esc(fwDraft.opts)}</textarea>
+      <button class="btn" style="width:100%;margin-top:8px" id="fwAdd">Add wheel</button></div>
+  </div>`);
+  // mysteries
+  const mb=v.querySelector('#myst');
+  (S.data.group_bets||[]).filter(g=>g.category==='mystery').forEach(m=>{
+    const r=m.race_id?raceById(m.race_id):null;
+    const rn=r&&(S.data.runners||[]).find(x=>x.race_id===r.id&&x.number===m.runner_number);
+    const c=el(`<div class="card"><div class="spread"><b>🎡 ${esc(m.label)}</b><span class="pill ${m.gender_scope==='M'?'blue':'rose'}">$${m.stake}</span></div>
+      <div class="small" style="margin-top:6px">${r?`<b>R${r.race_no} ${esc(r.name)}</b> → <b>#${m.runner_number}${rn?' '+esc(rn.horse_name):''}</b>${m.odds?` @ $${m.odds}`:''} ${m.status!=='open'?`· <span class="pill done">${esc(m.status.toUpperCase())}</span>`:''}`:'<span class="mut">Not spun yet</span>'}</div></div>`);
+    if(me.is_admin){ const b=el(`<button class="btn sm" style="margin-top:8px">🎡 ${m.race_id?'Re-spin':'Spin'}</button>`); b.onclick=()=>openMysteryWheel(m); c.appendChild(b); }
+    mb.appendChild(c);
+  });
+  // fun wheels
+  const fb=v.querySelector('#fun'); const list=funWheels();
+  if(!list.length) fb.appendChild(el(`<div class="card"><span class="mut small">No fun wheels yet. Add one below 👇</span></div>`));
+  list.forEach(w=>{
+    const c=el(`<div class="card"><div class="spread"><b>${esc(w.title)}</b><span class="mut small">${w.options.length} options</span></div>
+      <div class="mut small" style="margin-top:4px">${w.options.map(esc).join(' · ')}</div>
+      ${w.last?`<div class="ok small" style="margin-top:8px">Last spin: <b>${esc(w.last.result)}</b> <span class="mut">(spun by ${esc(w.last.by)}, ${melbTime(w.last.at)})</span></div>`:''}
+      <div class="row" style="margin-top:8px"><button class="btn sm spin" style="flex:1">🎡 Spin it</button>${(me.is_admin||w.by_id===S.me)?'<button class="btn sec sm del">✕</button>':''}</div></div>`);
+    c.querySelector('.spin').onclick=()=>openFunWheel(w);
+    const d=c.querySelector('.del'); if(d) d.onclick=async()=>{ if(!confirm(`Delete "${w.title}"?`)) return; await saveFunWheels(l=>l.filter(x=>x.id!==w.id)); render(); };
+    fb.appendChild(c);
+  });
+  // new wheel
+  const t=v.querySelector('.fwt'), o=v.querySelector('.fwo');
+  t.oninput=()=>fwDraft.title=t.value; o.oninput=()=>fwDraft.opts=o.value;
+  const names=g=>(S.data.players||[]).slice().sort((a,b)=>a.sort_order-b.sort_order).filter(p=>g==='ALL'||p.gender===g).map(p=>p.display_name);
+  v.querySelectorAll('.chiprow button').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.p; let add=[];
+    if(k==='X'){ o.value=''; }
+    else { add = k==='C' ? (S.data.couples||[]).slice().sort((a,b)=>a.id-b.id).map(c=>c.label) : names(k);
+      const cur=o.value.split('\n').map(x=>x.trim()).filter(Boolean); o.value=[...cur,...add.filter(x=>!cur.includes(x))].join('\n'); }
+    fwDraft.opts=o.value;
+    if(!t.value.trim() && k!=='X'){ t.value=`Who's getting this round? (${k==='M'?'Boys':k==='F'?'Girls':k==='C'?'Couples':'Everyone'})`; fwDraft.title=t.value; }
+  });
+  v.querySelector('#fwAdd').onclick=async()=>{
+    const title=t.value.trim(), opts=o.value.split('\n').map(x=>x.trim()).filter(Boolean);
+    if(!title){ alert('Give the wheel a question'); return; }
+    if(opts.length<2){ alert('Add at least 2 options'); return; }
+    if(opts.length>24){ alert('24 options max'); return; }
+    const ok=await saveFunWheels(l=>[...l,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),title,options:opts,by_id:S.me,by:me.display_name||'',created_at:new Date().toISOString()}]);
+    if(ok){ fwDraft={title:'',opts:''}; S.dirty=false; render(); }
+  };
+  return v;
+}
+async function openFunWheel(w){
+  const opts=(w.options||[]).filter(Boolean); if(opts.length<2){ alert('This wheel needs at least 2 options'); return; }
+  const by=(myPlayer()||{}).display_name||'Someone';
+  const W=wheelOverlay(w.title,'📡 Live on every phone');
+  let done=false;
+  W.close.onclick=()=>{ W.ov.remove(); if(!done) wheelSend({t:'close',label:w.title}); };
+  W.wt.textContent='Spin it!';
+  const wheel=buildWheel(W.stage,opts);
+  wheelSend({t:'open',label:w.title,by,stage:1,title:'Spin it!',labels:opts});
+  await waitSpinTap(W.ctrl);
+  const pick=pickTarget(opts.length);
+  wheelSend({t:'spin',stage:1,T:pick.T});
+  W.ctrl.innerHTML='<div class="count">Spinning…</div>';
+  await spinTo(wheel,pick.T);
+  if(!document.body.contains(W.ov)) return;
+  done=true;
+  const rv={kind:'fun',label:w.title,result:opts[pick.i],by};
+  wheelSend({t:'reveal',...rv});
+  W.wt.textContent='🎉 The wheel has spoken!';
+  W.stage.innerHTML=revealHtml(rv);
+  W.ctrl.innerHTML='';
+  const d=el(`<button class="btn">Done 🍻</button>`); d.onclick=()=>{ W.ov.remove(); render(); }; W.ctrl.appendChild(d);
+  await saveFunWheels(l=>l.map(x=>x.id===w.id?{...x,last:{result:rv.result,by,at:new Date().toISOString()}}:x));
 }
 
 // ---------- rules / how to play ----------
@@ -482,9 +625,11 @@ function renderRules(){
   const v=el(`<div class="wrap rules"><h2 style="margin-top:14px">📖 How it works</h2>
     <p class="hint">Steaks Day · Flemington × Rosehill · first race 2:30pm (Melbourne). Real money on Sportsbet, one live leaderboard, and Guys v Girls.</p>
 
+    ${closeBar()}
     <div class="card"><h3>⚡ Your day, ${esc(me.display_name||'')}</h3>
       <ul>
-        <li><b>Pick of the Day:</b> ${pod?`<b>R${pod.race_no} ${esc(pod.track)} ${esc(pod.name)}</b>, ${melbTime(pod.jump_time)}`:'not drawn yet'}. $25, double points.</li>
+        <li><b>Your group pick:</b> ${pod?`<b>R${pod.race_no} ${esc(pod.track)} ${esc(pod.name)}</b>, ${melbTime(pod.jump_time)}`:'not drawn yet'}. Pick one horse for your team ($25).</li>
+        <li><b>Pick of the Day:</b> your own best bet, any race. $25, double points.</li>
         ${myQ?`<li><b>Your Flem quaddie legs:</b> ${myQ}</li>`:''}
         <li><b>Rosehill quaddie:</b> everyone picks one horse in each of R7–R10.</li>
         <li><b>Feature (Champions Stakes, 5:10pm):</b> vote your team's horse in Games → Feature.</li>
@@ -493,56 +638,60 @@ function renderRules(){
     <div class="card"><h3>🎰 Placing a bet</h3>
       <ol>
         <li>Go to <b>My Bets</b>.</li>
-        <li>Pick your horse, then type in the <b>Sportsbet odds</b> (e.g. 4.50). Tap <b>Place</b>. You can change it any time before the jump.</li>
-        <li>Bets <b>lock at the jump</b>, and the countdowns are on the Races tab.</li>
-        <li>You get <b>5 bets × $10</b> on any races, plus your <b>Pick of the Day</b>.</li>
-        <li><b>No double-dipping:</b> races where you're repping the group (your Pick of the Day and your quaddie legs) don't show in your 5 bets.</li>
+        <li>Pick your horse and tap <b>Pick</b>. <b>No odds needed.</b> You can change it until picks close.</li>
+        <li><b>All picks close at ${melbTime(betsCloseAt().toISOString())}</b>: bets, Pick of the Day, group pick, quaddie legs and Feature votes. ${esc(adminNames())} then put them on Sportsbet, and the odds you got show on each bet.</li>
+        <li>You get a <b>group pick</b> (your drawn race, for your team), your own <b>Pick of the Day</b> (any race, $25, ×2), and <b>5 bets × $10</b> on any races.</li>
+        <li><b>No double-dipping:</b> races where you're repping the group (your group-pick race and your quaddie legs) don't show in your bets.</li>
         <li><b>Scratched?</b> You'll see a ⚠️, so pick again. If you leave it, the bet refunds (0 pts).</li>
       </ol></div>
 
     <div class="card"><h3>🎲 The games</h3>
       <table>
         <tr><td><b>Your 5 bets</b><br><span class="mut small">Your picks, any races</span></td><td>5 × $10</td></tr>
-        <tr><td><b>🎯 Pick of the Day</b><br><span class="mut small">Drawn race, one guy v one girl in each</span></td><td>$25 · ×2</td></tr>
+        <tr><td><b>🎯 Pick of the Day</b><br><span class="mut small">Your best bet: any race, a bit more on</span></td><td>16 × $25 · ×2</td></tr>
+        <tr><td><b>👥 Group pick</b><br><span class="mut small">Drawn race, one guy v one girl in each (Steaks race excluded: that's the Feature)</span></td><td>16 × $25</td></tr>
         <tr><td><b>🐎 Boys Flem quaddie</b> (R6–R9)<br><span class="mut small">Drawn 4 + 4: you pick in your 2 legs</span></td><td>$125</td></tr>
         <tr><td><b>🐎 Girls Flem quaddie</b> (R6–R9)<br><span class="mut small">Same as the boys</span></td><td>$125</td></tr>
         <tr><td><b>🐎 Rosehill mixed quaddie</b> (R7–R10)<br><span class="mut small">All 16 pick every leg</span></td><td>$200</td></tr>
         <tr><td><b>🥩 Steaks Day Feature</b> (Flem R8, 5:10pm)<br><span class="mut small">Team vote: guys' horse v girls' horse, $100 each-way each. 🥂 Glasses up!</span></td><td>$200 · ×3</td></tr>
         <tr><td><b>🆓 Get Out of Jail</b><br><span class="mut small">Guys on Flem R9 · Girls on Rose R10</span></td><td>2 × $25</td></tr>
-        <tr><td><b>🎡 Mysteries</b><br><span class="mut small">The wheel picks a race, then a horse. Watch it spin live!</span></td><td>4 × $25</td></tr>
-        <tr><td><b>Total pot</b></td><td>$2,000</td></tr>
+        <tr><td><b>🎡 Mysteries</b><br><span class="mut small">In the Wheel tab: it picks a race, then a horse. Watch it spin live!</span></td><td>4 × $25</td></tr>
+        <tr><td><b>Total</b></td><td>$2,400</td></tr>
       </table></div>
 
     <div class="card"><h3>🏆 Points & boards</h3>
       <ul>
         <li><b>Points = profit.</b> A win scores stake × odds − stake (e.g. $10 @ 4.50 = +35). A loss scores −stake.</li>
-        <li><b>Pick of the Day ×2</b>, <b>Feature ×3</b>. Each-way is half on the win and half on the place.</li>
+        <li><b>Pick of the Day ×2</b>, <b>Feature ×3</b>, group pick ×1. Each-way is half on the win and half on the place.</li>
         <li><b>Quaddies:</b> +${QUADDIE_LEG_PTS} for every leg you pick right, to your team. Once all 4 legs are run, the Sportsbet return minus the stake is added (the Rosehill quaddie splits 50/50).</li>
-        <li><b>Players & Couples</b> boards count your own 6 bets. <b>Guys v Girls</b> counts everything, including the team games.</li>
+        <li><b>Players & Couples</b> boards count your own bets: the 5 plus Pick of the Day. <b>Guys v Girls</b> counts everything, including group picks and the team games.</li>
         <li>🥄 <b>Mug Punter</b> = last on the Players board when the day ends.</li>
         <li>The <b>Group P&L</b> up top is the real money back from Sportsbet.</li>
       </ul></div>
 
     <div class="card"><h3>⏰ Key times</h3>
       <table>
+        <tr><td>⏰ <b>All picks close</b></td><td>${melbTime(betsCloseAt().toISOString())}</td></tr>
         <tr><td>First race · Fisher Stakes</td><td>2:30pm</td></tr>
         <tr><td>Flem quaddie starts (R6)</td><td>3:50pm</td></tr>
         <tr><td>Rosehill quaddie starts (R7)</td><td>4:10pm</td></tr>
-        <tr><td>🥩 Feature votes lock before</td><td>5:10pm</td></tr>
+
         <tr><td>Last race · Rose R10</td><td>6:05pm</td></tr>
       </table></div>
 
     ${me.is_admin?`<div class="card"><h3>🛠️ Admin: running the day</h3>
       <ol>
         <li><b>Fields:</b> loaded. Late scratchings go in Admin → the race → <i>Field · load / scratch</i> → tap the horse.</li>
-        <li><b>Draws:</b> Pick of the Day and the Flem quaddie splits are done. Re-drawing asks first.</li>
-        <li><b>Mysteries:</b> Admin → Spin. The wheel spins live on every open phone.</li>
+        <li><b>Draws:</b> group-pick races and the Flem quaddie splits are done. Re-drawing asks first.</li>
+        <li><b>Picks close</b> at the time set in Admin (default 2:00pm). Then open the <b>🧾 Bet slip</b>, put each pick on, and type the odds you got.</li>
+        <li><b>Mysteries:</b> 🎡 Wheel tab → Spin, before the close, so they can go on too.</li>
         <li><b>Team bets:</b> Admin → <i>Group bets: horse & odds</i>. Enter the Get Out horses and the odds you took for each team bet.</li>
-        <li><b>Feature:</b> tap <i>Lock feature votes</i> before 5:10, then enter both teams' odds.</li>
+        <li><b>Feature:</b> tap <i>Lock feature votes</i> after picks close, then enter both teams' odds.</li>
         <li><b>Each result:</b> the race → Winner # (+ placed #s for each-way) → <b>Settle</b>. The board moves straight away. Re-settling is safe.</li>
         <li><b>Quaddies:</b> after the last leg, enter the $ returned in <i>Quaddie returns</i> (0 if it missed).</li>
         <li><b>Group P&L:</b> update the total $ returned from Sportsbet as you go.</li>
       </ol></div>`:''}
+    <div class="card"><h3>🍻 The Wheel</h3><p>The 🎡 Wheel tab has the Mysteries plus fun wheels. Make one like "Who's getting this round?", tap Boys / Girls / Everyone, and spin it. It spins live on everyone's phone.</p></div>
     <p class="tagline">Tip: Share → Add to Home Screen for the full-screen app.</p>
   </div>`);
   return v;
@@ -555,14 +704,14 @@ function renderGames(){
     <div class="tabs">
       <div class="tab ${gameTab==='quaddies'?'on':''}" data-t="quaddies">Quaddies</div>
       <div class="tab ${gameTab==='feature'?'on':''}" data-t="feature">Feature</div>
-      <div class="tab ${gameTab==='myst'?'on':''}" data-t="myst">Mysteries</div>
       <div class="tab ${gameTab==='getout'?'on':''}" data-t="getout">Get&nbsp;Out</div>
+      <div class="tab ${gameTab==='group'?'on':''}" data-t="group">📋 Group</div>
     </div><div id="gbody"></div></div>`);
   v.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{gameTab=t.dataset.t;render();});
   const body=v.querySelector('#gbody');
   if(gameTab==='quaddies') renderQuaddies(body);
   else if(gameTab==='feature') renderFeature(body);
-  else if(gameTab==='myst') renderMysteries(body);
+  else if(gameTab==='group') renderGroupView(body);
   else renderGetout(body);
   return v;
 }
@@ -597,7 +746,7 @@ function quaddieLeg(q,race,legIndex){
   if(!race) return el('<div></div>');
   const mine=(S.data.quaddie_entries||[]).find(e=>e.quaddie_id===q.id&&e.player_id===S.me&&e.leg_index===legIndex);
   const runners=(S.data.runners||[]).filter(x=>x.race_id===race.id&&!x.scratched).sort((a,b)=>a.number-b.number);
-  const locked=isLocked(race);
+  const locked=pickLocked(race);
   const rOpts = runners.length
     ? `<select class="rn"><option value="">#…</option>${runners.map(r=>`<option value="${r.number}" ${mine&&mine.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
     : `<input class="rn2" type="number" inputmode="numeric" placeholder="Runner #" value="${mine?mine.runner_number||'':''}">`;
@@ -635,7 +784,8 @@ function renderFeature(box){
   const rOpts = runners.length
     ? `<select class="rn"><option value="">Vote a runner…</option>${runners.map(r=>`<option value="${r.number}" ${myVote&&myVote.runner_number===r.number?'selected':''}>#${r.number} ${esc(r.horse_name)}</option>`).join('')}</select>`
     : `<input class="rn2" type="number" inputmode="numeric" placeholder="Vote runner #" value="${myVote?myVote.runner_number||'':''}">`;
-  if(!lockedLive){
+  if(!lockedLive && picksClosed() && !isAdminMe()) fb.appendChild(el(`<div class="hint">Voting closed at ${melbTime(betsCloseAt().toISOString())}.${myVote?` You voted #${myVote.runner_number}.`:''}</div>`));
+  if(!lockedLive && !(picksClosed() && !isAdminMe())){
     const row=el(`<div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px"><div>${rOpts}</div><button class="btn sm save">Vote</button></div>`);
     row.querySelector('.save').onclick=async()=>{
       if(await jumped(race||{id:108})) return;
@@ -652,13 +802,52 @@ function renderFeature(box){
   if(trows) fb.appendChild(el(`<hr><div class="mut small">Your team's votes</div>${trows}`));
   box.appendChild(card);
 }
-function renderMysteries(box){
-  box.appendChild(el(`<p class="hint">The wheel: spin 1 = random race, spin 2 = random horse. Admin spins each one live.</p>`));
-  (S.data.group_bets||[]).filter(g=>g.category==='mystery').forEach(m=>{
-    const r=m.race_id?raceById(m.race_id):null;
-    box.appendChild(el(`<div class="card"><div class="spread"><b>🎡 ${esc(m.label)}</b><span class="pill ${m.gender_scope==='M'?'blue':'rose'}">$${m.stake}</span></div>
-      <div class="small" style="margin-top:6px">${r?`<b>R${r.race_no} ${esc(r.name)}</b> → <b>#${m.runner_number||'?'}</b> ${m.status!=='open'?`· <span class="pill done">${m.status.toUpperCase()}</span>`:''}`:'<span class="mut">Not spun yet 🎡</span>'}</div></div>`));
+// Everything the admins set up, read-only for the whole squad.
+function renderGroupView(box){
+  const P=id=>(S.data.players||[]).find(p=>p.id===id);
+  const horse=(raceId,n)=>{ const r=(S.data.runners||[]).find(x=>x.race_id===raceId&&x.number===n); return n?`#${n}${r?' '+esc(r.horse_name):''}`:'—'; };
+  const show=picksClosed()||isAdminMe();   // horses stay hidden until picks close, so nobody copies
+  box.appendChild(el(closeBar()));
+  // team bets
+  const tb=el(`<div class="card"><b>👥 Team bets</b><div class="hint">Set by ${esc(adminNames())}. Odds go in when the bet is on.</div><div class="tbl"></div></div>`);
+  (S.data.group_bets||[]).slice().sort((a,b)=>a.id-b.id).forEach(g=>{
+    const fp=g.category==='feature'?(S.data.feature_picks||[]).find(p=>p.gender===g.gender_scope):null;
+    const rn=g.category==='feature'?(fp&&fp.locked?fp.runner_number:null):g.runner_number;
+    const r=g.race_id?raceById(g.race_id):null;
+    tb.querySelector('.tbl').appendChild(el(`<div class="lb"><div style="flex:1"><div><b>${esc(g.label)}</b></div>
+      <div class="mut small">${r?`R${r.race_no} ${esc(r.track.slice(0,4))} · ${melbTime(r.jump_time)}`:(g.category==='mystery'?'🎡 not spun yet':'')}${rn?` · ${horse(g.race_id,rn)}`:(g.category==='feature'?' · team vote':'')}</div></div>
+      <div style="text-align:right" class="small">${g.odds?`<b>$${g.odds}</b>`:'<span class="mut">odds —</span>'}${g.status!=='open'?`<div><span class="pill done">${esc(g.status.toUpperCase())}${g.points?` ${g.points>0?'+':''}${Math.round(g.points)}`:''}</span></div>`:''}</div></div>`));
   });
+  box.appendChild(tb);
+  // group picks per race
+  const gp=el(`<div class="card"><b>🎯 Group picks · drawn races</b><div class="hint">${show?'Guy v girl in every race.':'Who has which race. The horses show once picks close.'}</div><div class="tbl"></div></div>`);
+  const byRace={}; (S.data.pod_assignments||[]).forEach(a=>(byRace[a.race_id]=byRace[a.race_id]||[]).push(a.player_id));
+  Object.keys(byRace).map(Number).sort((a,b)=>raceById(a).sort_order-raceById(b).sort_order).forEach(rid=>{
+    const r=raceById(rid);
+    const cell=pid=>{ const p=P(pid); const b=(S.data.bets||[]).find(x=>x.player_id===pid&&x.race_id===rid&&x.bet_type==='group_pick');
+      return `${p.gender==='M'?'👔':'👗'} ${esc(p.display_name)}: ${b?(show?horse(rid,b.runner_number)+(b.odds?` @ $${b.odds}`:''):'✓ picked'):'<span class="mut">not yet</span>'}`; };
+    const ids=byRace[rid].slice().sort((a,b)=>(P(a).gender==='M'?0:1)-(P(b).gender==='M'?0:1));
+    gp.querySelector('.tbl').appendChild(el(`<div class="lb" style="display:block"><div class="small"><b>R${r.race_no} ${esc(r.track.slice(0,4))} · ${esc(r.name)}</b> <span class="mut">${melbTime(r.jump_time)}</span></div>
+      ${ids.map(id=>`<div class="small">${cell(id)}</div>`).join('')}</div>`));
+  });
+  box.appendChild(gp);
+  // quaddies
+  const qd=el(`<div class="card"><b>🐎 Quaddies</b><div class="tbl"></div></div>`); const qr=quaddieReturns();
+  (S.data.quaddies||[]).forEach(q=>{
+    const legs=(q.leg_race_ids||[]).map(raceById);
+    let who='';
+    if(q.style==='split'){
+      const g=grp=>(S.data.quaddie_groups||[]).filter(x=>x.quaddie_id===q.id&&x.grp===grp).map(x=>esc(P(x.player_id).display_name)).join(', ')||'draw pending';
+      who=`<div class="small">Legs 1–2: ${g('first')}</div><div class="small">Legs 3–4: ${g('last')}</div>`;
+    } else who=`<div class="small">Everyone picks every leg</div>`;
+    const nums=show?legs.map((r,i)=>{ const ns=[...new Set((S.data.quaddie_entries||[]).filter(e=>e.quaddie_id===q.id&&e.leg_index===i+1).map(e=>e.runner_number))].sort((a,b)=>a-b);
+      return `L${i+1} ${r?'R'+r.race_no:''}: ${ns.length?ns.join(', '):'—'}`; }).join(' · '):'';
+    qd.querySelector('.tbl').appendChild(el(`<div class="lb" style="display:block"><div class="spread"><b class="small">${esc(q.name)}</b><span class="pill g">$${q.stake}</span></div>${who}
+      ${nums?`<div class="mut small">${nums}</div>`:''}${qr[q.id]?`<div class="small">Returned: <b>$${qr[q.id]}</b></div>`:''}</div>`));
+  });
+  box.appendChild(qd);
+  const pnl=groupPnl();
+  box.appendChild(el(`<div class="card"><div class="spread"><b>💰 Group P&L</b><span class="${pnl.returned-pnl.staked>=0?'pos':'neg'}"><b>${money(pnl.returned-pnl.staked)}</b></span></div><div class="mut small">Staked ${money(pnl.staked)} · returned ${money(pnl.returned)}</div></div>`));
 }
 function renderGetout(box){
   box.appendChild(el(`<p class="hint">Final-race redemption — one last-race bet per team. 👔 Boys on Flem R9, 👗 Girls on Rose R10.</p>`));
@@ -675,11 +864,19 @@ function renderAdmin(){
   const v=el(`<div class="wrap"><h2 style="margin-top:14px">🛠️ Admin <span class="mut small">(${esc(myPlayer().display_name)})</span></h2>
     <div class="card"><b>Draws & setup</b>
       <div class="grid" style="margin-top:8px">
-        <button class="btn sec" id="drawPod">🎯 Draw Pick-of-the-Day races</button>
+        <button class="btn sec" id="drawPod">👥 Draw group-pick races</button>
         <button class="btn sec" id="drawQ">🐎 Draw Flem quaddie splits</button>
         <button class="btn sec" id="lockFeat">🥩 Lock feature votes (most-voted runs)</button>
       </div><div class="hint" id="aMsg"></div></div>
-    <div class="card"><b>Spin a Mystery 🎡</b><div class="grid" id="spinBox" style="margin-top:8px"></div></div>
+    <div class="card"><b>⏰ Picks close at</b>
+      <div class="hint">Everyone's picks lock at this time so you can put them on. Admins can still change picks after it.</div>
+      <div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px">
+        <div><input id="closeIn" type="time" value="${betsCloseAt().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Melbourne'})}"></div>
+        <button class="btn sm" id="closeSave">Save</button></div>
+      <div class="hint">Mysteries are spun in the 🎡 Wheel tab.</div></div>
+    <div class="card"><b>🧾 Bet slip: put these on Sportsbet</b>
+      <div class="hint">Every pick, race by race. Put it on, type the odds you got, tap ✓. Players see the odds on their bet. Team bets are in <i>Group bets</i> below.</div>
+      <div id="slipBox"></div></div>
     <div class="card"><b>Group P&L</b>
       <div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px">
         <div><label>Total returned from Sportsbet ($)</label><input id="pnlIn" type="number" value="${groupPnl().returned}"></div>
@@ -701,12 +898,13 @@ function renderAdmin(){
     await sb.from('settings').upsert({key:'pnl',value:{staked:2000,returned:val}},{onConflict:'key'});
     await loadAll(); render();
   };
-  // spin buttons
-  const sb_=v.querySelector('#spinBox');
-  (S.data.group_bets||[]).filter(g=>g.category==='mystery').forEach(m=>{
-    const b=el(`<button class="btn sec sm">🎡 Spin ${esc(m.label)}${m.race_id?' (re-spin)':''}</button>`);
-    b.onclick=()=>openMysteryWheel(m); sb_.appendChild(b);
-  });
+  v.querySelector('#closeSave').onclick=async()=>{
+    const hm=v.querySelector('#closeIn').value; if(!/^\d{2}:\d{2}$/.test(hm)){ alert('Pick a time'); return; }
+    const at=`2026-11-07T${hm}:00+11:00`;
+    const {error}=await sb.from('settings').upsert({key:'bets_close',value:{at}},{onConflict:'key'});
+    if(error){ alert(error.message); return; } await loadAll(); render();
+  };
+  renderSlip(v.querySelector('#slipBox'));
   const gbBox=v.querySelector('#gbBox');
   (S.data.group_bets||[]).slice().sort((a,b)=>a.id-b.id).forEach(g=>gbBox.appendChild(groupBetEditor(g)));
   const qrBox=v.querySelector('#qrBox'); const qr=quaddieReturns();
@@ -725,6 +923,42 @@ function renderAdmin(){
   const box=v.querySelector('#adminRaces');
   (S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order).forEach(r=>box.appendChild(adminRace(r)));
   return v;
+}
+function renderSlip(box){
+  const P=id=>(S.data.players||[]).find(p=>p.id===id);
+  const TYPE={group_pick:'👥 group',pick_of_day:'🎯 POD',individual:'bet'};
+  const races=(S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
+  const all=S.data.bets||[];
+  const on=all.filter(b=>Number(b.odds)>1).length;
+  box.appendChild(el(`<div class="small" style="margin:6px 0"><b>${on}</b> of <b>${all.length}</b> picks have odds (are on).</div>`));
+  races.forEach(r=>{
+    const bets=all.filter(b=>b.race_id===r.id).sort((a,b)=>a.runner_number-b.runner_number||a.player_id-b.player_id);
+    if(!bets.length) return;
+    const n=bets.filter(b=>Number(b.odds)>1).length;
+    const det=el(`<details class="fdet" ${S.openSlip&&S.openSlip.has(r.id)?'open':''}><summary class="small" style="margin-top:6px"><b>R${r.race_no} ${esc(r.track.slice(0,4))} · ${esc(r.name)}</b> · ${melbTime(r.jump_time)} · ${n}/${bets.length} on${n===bets.length?' ✅':''}</summary><div></div></details>`);
+    det.ontoggle=e=>{ S.openSlip=S.openSlip||new Set(); e.target.open?S.openSlip.add(r.id):S.openSlip.delete(r.id); };
+    const body=det.querySelector('div');
+    bets.forEach(b=>{
+      const p=P(b.player_id)||{};
+      const row=el(`<div class="slip"><div><b>#${b.runner_number}</b> ${esc(b.horse_name||'')}<div class="mut">${esc(p.display_name||'?')} · ${TYPE[b.bet_type]||b.bet_type} · $${b.stake}</div></div>
+        <input type="number" step="0.01" inputmode="decimal" placeholder="odds" value="${b.odds||''}"><button class="btn sm">${Number(b.odds)>1?'✓':'Save'}</button></div>`);
+      row.querySelector('button').onclick=async()=>{
+        const od=Number(row.querySelector('input').value); if(!(od>1)){ alert('Enter the odds you got (e.g. 4.50)'); return; }
+        const {error}=await sb.from('bets').update({odds:od}).eq('id',b.id);
+        if(error){ alert(error.message); return; }
+        if(r.status==='resulted') alert(`R${r.race_no} is already settled. Tap Re-settle on it to apply these odds.`);
+        await loadAll(); render();
+      };
+      body.appendChild(row);
+    });
+    box.appendChild(det);
+  });
+  // quaddie lines to put on
+  (S.data.quaddies||[]).forEach(q=>{
+    const legs=(q.leg_race_ids||[]).map(raceById);
+    const lines=legs.map((lr,i)=>{ const ns=[...new Set((S.data.quaddie_entries||[]).filter(e=>e.quaddie_id===q.id&&e.leg_index===i+1).map(e=>e.runner_number))].sort((a,b)=>a-b); return `${lr?'R'+lr.race_no:'?'}: ${ns.length?ns.join(', '):'—'}`; });
+    box.appendChild(el(`<div class="slip" style="grid-template-columns:1fr"><div><b>${esc(q.name)}</b> · $${q.stake}<div class="mut">${lines.join(' / ')}</div></div></div>`));
+  });
 }
 function adminRace(r){
   const resulted=r.status==='resulted';
@@ -801,7 +1035,7 @@ function isScratched(raceId,num){ return (S.data.runners||[]).some(x=>x.race_id=
 function picksOn(raceId,num){
   const pn=id=>{const p=(S.data.players||[]).find(p=>p.id===id);return p?p.display_name:'?';};
   const out=[];
-  (S.data.bets||[]).filter(b=>b.race_id===raceId&&b.runner_number===num).forEach(b=>out.push(pn(b.player_id)+(b.bet_type==='pick_of_day'?' (POD)':'')));
+  (S.data.bets||[]).filter(b=>b.race_id===raceId&&b.runner_number===num).forEach(b=>out.push(pn(b.player_id)+(b.bet_type==='pick_of_day'?' (POD)':b.bet_type==='group_pick'?' (group pick)':'')));
   (S.data.quaddie_entries||[]).forEach(e=>{ const q=(S.data.quaddies||[]).find(q=>q.id===e.quaddie_id);
     if(q && (q.leg_race_ids||[])[e.leg_index-1]===raceId && e.runner_number===num) out.push(pn(e.player_id)+' (quaddie)'); });
   if(raceId===108){
@@ -834,7 +1068,7 @@ function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor
 async function drawPod(){
   await loadAll(); // the admin phone may have slept and missed live updates
   // 8 nominated races, assign each of 8 boys to one race, each of 8 girls to one race (random)
-  if((S.data.pod_assignments||[]).length && !confirm('Already drawn. Re-draw Pick of the Day? Everyone gets a new race, and any POD bets already placed stay on the old race.')) return;
+  if((S.data.pod_assignments||[]).length && !confirm('Already drawn. Re-draw the group-pick races? Everyone gets a new race, and group picks already placed stay on the old race.')) return;
   const noms=(S.data.races||[]).filter(r=>r.pod_nominated).sort((a,b)=>a.sort_order-b.sort_order);
   const boys=shuffle((S.data.players||[]).filter(p=>p.gender==='M'));
   const girls=shuffle((S.data.players||[]).filter(p=>p.gender==='F'));
@@ -842,7 +1076,7 @@ async function drawPod(){
   boys.forEach((p,i)=>rows.push({player_id:p.id,race_id:noms[i%noms.length].id}));
   girls.forEach((p,i)=>rows.push({player_id:p.id,race_id:noms[i%noms.length].id}));
   const {error}=await sb.from('pod_assignments').upsert(rows,{onConflict:'player_id'});
-  msg(error?('Error: '+error.message):'Pick-of-the-Day races drawn ✓'); await loadAll(); render();
+  msg(error?('Error: '+error.message):'Group-pick races drawn ✓'); await loadAll(); render();
 }
 async function drawQuaddieSplits(){
   await loadAll(); // the admin phone may have slept and missed live updates
@@ -908,9 +1142,12 @@ function buildWheel(stage,labels){
   const wrap=el(`<div class="wheelstage"><div class="wpointer"></div><div class="wheel"></div><div class="whub">🐎</div></div>`);
   const wheel=wrap.querySelector('.wheel');
   wheel.style.background=`conic-gradient(${stops})`;
+  const radial = N>8 || labels.some(t=>String(t).length>8);
   labels.forEach((t,i)=>{
-    const lab=el(`<div class="lab">${esc(t)}</div>`);
-    lab.style.transform=`translate(-50%,-50%) rotate(${i*seg+seg/2}deg) translateY(-116px)`;
+    const lab=el(`<div class="lab${radial?' radial':''}">${esc(t)}</div>`);
+    lab.style.transform = radial
+      ? `translate(-50%,-50%) rotate(${i*seg+seg/2}deg) translateY(-80px) rotate(-90deg)`
+      : `translate(-50%,-50%) rotate(${i*seg+seg/2}deg) translateY(-116px)`;
     wheel.appendChild(lab);
   });
   stage.appendChild(wrap);
@@ -937,6 +1174,7 @@ function waitSpinTap(ctrl){
   });
 }
 function revealHtml(p){
+  if(p.kind==='fun') return `<div class="bigreveal">${esc(p.label)}<br><b style="font-size:34px;color:var(--gold)">${esc(p.result)}</b></div>`;
   return `<div class="bigreveal">${esc(p.label)}<br><b>R${esc(p.raceNo)} ${esc(p.raceName)}</b><br>→ <b style="font-size:30px;color:var(--gold)">#${esc(p.rn)}</b>${p.horse?`<br><span style="font-size:18px">${esc(p.horse)}</span>`:''}</div>`;
 }
 
@@ -1017,7 +1255,7 @@ function onWheelMsg(p){
     const W=WV.W;
     WV.anim.then(()=>{
       if(!document.body.contains(W.ov)) return;
-      W.wt.textContent='🥂 Locked in!';
+      W.wt.textContent= p.kind==='fun' ? '🎉 The wheel has spoken!' : '🥂 Locked in!';
       W.stage.innerHTML=revealHtml(p);
       W.ctrl.innerHTML='';
       const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=()=>W.ov.remove(); W.ctrl.appendChild(d);
@@ -1037,11 +1275,12 @@ async function settleRace(r,winStr,plcStr){
   // settle individual + pod bets on this race
   const bets=(S.data.bets||[]).filter(b=>b.race_id===r.id);
   for(const b of bets){
-    const mult = b.bet_type==='pick_of_day'?2:1;
+    const mult = b.bet_type==='pick_of_day'?2:1;   // group_pick and individual ×1
     let status='lost', payout=0, pts=0;
     if(scratched.has(b.runner_number)){ status='scratched'; payout=Number(b.stake); pts=0; } // refunded
-    else if(b.runner_number===win){ status='won'; payout=Number(b.stake)*Number(b.odds||0); pts=(payout-b.stake)*mult;
-      if(!b.odds) problems.push(`${(S.data.players||[]).find(p=>p.id===b.player_id)?.display_name}: winner has no odds`); }
+    else if(b.runner_number===win){ status='won';
+      if(Number(b.odds)>1){ payout=Number(b.stake)*Number(b.odds); pts=(payout-b.stake)*mult; }
+      else { payout=0; pts=0; problems.push(`${(S.data.players||[]).find(p=>p.id===b.player_id)?.display_name}: winner has no odds yet (enter it on the Bet slip, then Re-settle)`); } }
     else { pts = (0-Number(b.stake))*mult; }
     const {error}=await sb.from('bets').update({status,payout,points:pts}).eq('id',b.id);
     if(error) problems.push('bet '+b.id+': '+error.message);
