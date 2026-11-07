@@ -143,12 +143,20 @@ const esc = s => (s==null?'':(''+s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt
 async function loadAll(){
   const tables = ['couples','players','races','runners','bets','pod_assignments','quaddies','quaddie_groups','quaddie_entries','feature_votes','feature_picks','group_bets','settings'];
   const out = {};
+  let failed=false;
   await Promise.all(tables.map(async t=>{
-    const {data,error} = await sb.from(t).select('*');
-    out[t] = error ? [] : data;
+    let res; try{ res = await sb.from(t).select('*'); }catch(e){ res={error:e}; }
+    if(res.error || !res.data){ failed=true; out[t] = (S.data&&S.data[t]) || []; }   // keep the last good copy, never "empty"
+    else out[t] = res.data;
   }));
   S.data = out;
+  S.loadError = failed;
   S.loaded = true;
+}
+// Writes that decide things from the data (settle, draws, locks, fun wheels, picks) refuse to run on a failed load.
+function dataOk(){
+  if(S.loadError){ alert("Couldn't load the latest data (bad signal?). Nothing was changed. Try again in a moment."); return false; }
+  return true;
 }
 function raceById(id){ return (S.data.races||[]).find(r=>r.id===id); }
 function myPlayer(){ return (S.data.players||[]).find(p=>p.id===S.me); }
@@ -156,9 +164,11 @@ function isLocked(r){ if(!r) return true; if(r.status!=='upcoming') return true;
 // All picks close at one time (default 2:00pm) so the admins can put the real bets on Sportsbet.
 // Admins can still edit after the close; everyone else is locked. Races also lock at their own jump.
 const DEFAULT_CLOSE='2026-11-07T14:00:00+11:00';
-function betsCloseAt(){ const s=(S.data.settings||[]).find(s=>s.key==='bets_close'); return new Date((s&&s.value&&s.value.at)||DEFAULT_CLOSE); }
+function betsCloseAt(){ const s=(S.data.settings||[]).find(s=>s.key==='bets_close'); const d=new Date((s&&s.value&&s.value.at)||DEFAULT_CLOSE); return isNaN(d) ? new Date(DEFAULT_CLOSE) : d; }
 function picksClosed(){ return new Date()>=betsCloseAt(); }
-function isAdminMe(){ const p=myPlayer(); return !!(p&&p.is_admin); }
+function adminDevice(){ let a=null; try{ a=Number(localStorage.getItem('qs_admin'))||null; }catch(e){} const p=a&&(S.data.players||[]).find(x=>x.id===a); return p&&p.is_admin?p:null; }
+function isAdminMe(){ const p=myPlayer(); return !!((p&&p.is_admin) || adminDevice()); }   // an admin acting as a player keeps admin rights
+function actAs(id){ try{ localStorage.setItem('qs_me',id); }catch(e){} S.me=id; podPick=null; S.view='bets'; render(); }
 function pickLocked(r){ return isLocked(r) || (picksClosed() && !isAdminMe()); }
 function adminNames(){ return (S.data.players||[]).filter(p=>p.is_admin).map(p=>p.display_name).join(' & ')||'the admins'; }
 function closeBar(){
@@ -227,6 +237,13 @@ function render(){
   const views = {home:renderHome, races:renderRaces, bets:renderBets, games:renderGames, wheel:renderWheel, rules:renderRules, admin:renderAdmin};
   const y = window.scrollY;
   app.innerHTML = '';
+  if(me && me.is_admin){ try{ localStorage.setItem('qs_admin',me.id); }catch(e){} }
+  const adm=adminDevice();
+  if(adm && me && adm.id!==me.id){
+    const bar=el(`<div class="closebar open" style="margin:12px 16px 0;display:flex;align-items:center;gap:8px"><span style="flex:1">🛠️ <b>${esc(adm.display_name)}</b>, acting as <b>${esc(me.display_name)}</b></span><button class="btn sm">Back to ${esc(adm.display_name)}</button></div>`);
+    bar.querySelector('button').onclick=()=>{ actAs(adm.id); S.view='admin'; render(); };
+    app.appendChild(bar);
+  }
   app.appendChild((views[S.view]||renderHome)());
   window.scrollTo(0,y);
   S.dirty=false; S.pending=false; $('#refresh').style.display='none';
@@ -279,7 +296,7 @@ function confirmLogin(p){
   </div></div>`);
   document.body.appendChild(sheet);
   sheet.querySelector('#no').onclick=()=>sheet.remove();
-  sheet.querySelector('#yes').onclick=()=>{ localStorage.setItem('qs_me',p.id); S.me=p.id; sheet.remove(); S.view='home'; render(); };
+  sheet.querySelector('#yes').onclick=()=>{ localStorage.setItem('qs_me',p.id); try{ if(p.is_admin) localStorage.setItem('qs_admin',p.id); else localStorage.removeItem('qs_admin'); }catch(e){} S.me=p.id; sheet.remove(); S.view='home'; render(); };
 }
 
 // ---------- home / leaderboard ----------
@@ -425,6 +442,7 @@ function myQuaddieLegRaces(){
 // Lock is enforced on save too: a form drawn before the jump must not save after it.
 async function jumped(race){
   await loadAll();
+  if(!dataOk()) return true;
   if(isLocked(raceById(race.id))){ alert('This race has jumped — picks are locked.'); render(); return true; }
   if(picksClosed() && !isAdminMe()){ alert(`Picks closed at ${melbTime(betsCloseAt().toISOString())} so ${adminNames()} can put the bets on. Ask them if you need a change.`); render(); return true; }
   return false;
@@ -499,6 +517,24 @@ function betEditor(race,type,stake,blocked){
   box.appendChild(ed);
   if(mine) box.appendChild(el(`<div class="small" style="margin-top:6px">${mine.odds?`✅ On at <b>$${mine.odds}</b>`:`<span class="mut">✓ Picked #${mine.runner_number} ${esc(mine.horse_name||'')}. The odds show here once it's on.</span>`}</div>`));
   ed.querySelector('.save').onclick=async()=>{
+    if(S.saving) return; S.saving=true;
+    try{ await saveBet(); } finally{ S.saving=false; }
+  };
+  if(mine && type==='individual'){
+    const rm=el(`<button class="ibtn" style="margin-top:6px">Remove this bet</button>`);
+    rm.onclick=async()=>{
+      if(S.saving) return; S.saving=true;
+      try{
+        if(await jumped(race)) return;
+        if(!confirm(`Remove your $${stake} bet on R${race.race_no} ${race.name}?`)) return;
+        const {error}=await sb.from('bets').delete().eq('id',mine.id);
+        if(error){ alert('Error: '+error.message); return; }
+        await loadAll(); render();
+      } finally{ S.saving=false; }
+    };
+    box.appendChild(rm);
+  }
+  async function saveBet(){
     if(await jumped(race)) return;
     const rn = (ed.querySelector('.rn')||ed.querySelector('.rn2')).value;
     if(!rn){ alert('Pick a runner'); return; }
@@ -512,18 +548,22 @@ function betEditor(race,type,stake,blocked){
     if(error){ alert('Error: '+error.message); return; }
     if(type==='pick_of_day'){ await sb.from('bets').delete().eq('player_id',S.me).eq('bet_type','pick_of_day').neq('race_id',race.id); podPick=null; }
     await loadAll(); render();
-  };
+  }
   return box;
 }
 
 // ---------- 🎡 Wheel tab: Mysteries (admin spins) + fun wheels (anyone adds & spins), all live ----------
 function funWheels(){ const s=(S.data.settings||[]).find(s=>s.key==='fun_wheels'); return (s&&s.value&&s.value.list)||[]; }
-async function saveFunWheels(fn){
-  await loadAll();
-  const next=fn(funWheels());
-  const {error}=await sb.from('settings').upsert({key:'fun_wheels',value:{list:next}},{onConflict:'key'});
-  if(error){ alert('Error: '+error.message); return false; }
-  await loadAll(); return true;
+async function saveFunWheels(fn,applied){
+  for(let i=0;i<3;i++){
+    await loadAll(); if(!dataOk()) return false;
+    const next=fn(funWheels());
+    const {error}=await sb.from('settings').upsert({key:'fun_wheels',value:{list:next}},{onConflict:'key'});
+    if(error){ alert('Error: '+error.message); return false; }
+    await loadAll();
+    if(!applied || S.loadError || applied(funWheels())) return true;   // someone else saved at the same moment → redo ours on top
+  }
+  return true;
 }
 let fwDraft={title:'',opts:''};
 function renderWheel(){
@@ -564,7 +604,7 @@ function renderWheel(){
       ${w.last?`<div class="ok small" style="margin-top:8px">Last spin: <b>${esc(w.last.result)}</b> <span class="mut">(spun by ${esc(w.last.by)}, ${melbTime(w.last.at)})</span></div>`:''}
       <div class="row" style="margin-top:8px"><button class="btn sm spin" style="flex:1">🎡 Spin it</button>${(me.is_admin||w.by_id===S.me)?'<button class="btn sec sm del">✕</button>':''}</div></div>`);
     c.querySelector('.spin').onclick=()=>openFunWheel(w);
-    const d=c.querySelector('.del'); if(d) d.onclick=async()=>{ if(!confirm(`Delete "${w.title}"?`)) return; await saveFunWheels(l=>l.filter(x=>x.id!==w.id)); render(); };
+    const d=c.querySelector('.del'); if(d) d.onclick=async()=>{ if(!confirm(`Delete "${w.title}"?`)) return; await saveFunWheels(l=>l.filter(x=>x.id!==w.id), l=>!l.some(x=>x.id===w.id)); render(); };
     fb.appendChild(c);
   });
   // new wheel
@@ -584,17 +624,19 @@ function renderWheel(){
     if(!title){ alert('Give the wheel a question'); return; }
     if(opts.length<2){ alert('Add at least 2 options'); return; }
     if(opts.length>24){ alert('24 options max'); return; }
-    const ok=await saveFunWheels(l=>[...l,{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),title,options:opts,by_id:S.me,by:me.display_name||'',created_at:new Date().toISOString()}]);
+    const nid=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    const ok=await saveFunWheels(l=>[...l.filter(x=>x.id!==nid),{id:nid,title,options:opts,by_id:S.me,by:me.display_name||'',created_at:new Date().toISOString()}], l=>l.some(x=>x.id===nid));
     if(ok){ fwDraft={title:'',opts:''}; S.dirty=false; render(); }
   };
   return v;
 }
-async function openFunWheel(w){
+async function openFunWheel(w){ return drive(()=>driveFun(w)); }
+async function driveFun(w){
   const opts=(w.options||[]).filter(Boolean); if(opts.length<2){ alert('This wheel needs at least 2 options'); return; }
   const by=(myPlayer()||{}).display_name||'Someone';
   const W=wheelOverlay(w.title,'📡 Live on every phone');
   let done=false;
-  W.close.onclick=()=>{ W.ov.remove(); if(!done) wheelSend({t:'close',label:w.title}); };
+  W.close.onclick=()=>{ W.ov.remove(); if(!done) wheelSend({t:'close',label:w.title}); if(WD.cancel) WD.cancel(); };
   W.wt.textContent='Spin it!';
   const wheel=buildWheel(W.stage,opts);
   wheelSend({t:'open',label:w.title,by,stage:1,title:'Spin it!',labels:opts});
@@ -611,7 +653,8 @@ async function openFunWheel(w){
   W.stage.innerHTML=revealHtml(rv);
   W.ctrl.innerHTML='';
   const d=el(`<button class="btn">Done 🍻</button>`); d.onclick=()=>{ W.ov.remove(); render(); }; W.ctrl.appendChild(d);
-  await saveFunWheels(l=>l.map(x=>x.id===w.id?{...x,last:{result:rv.result,by,at:new Date().toISOString()}}:x));
+  const at=new Date().toISOString();
+  await saveFunWheels(l=>l.map(x=>x.id===w.id?{...x,last:{result:rv.result,by,at}}:x), l=>{ const x=l.find(x=>x.id===w.id); return !x || (x.last&&x.last.at===at); });
 }
 
 // ---------- rules / how to play ----------
@@ -875,6 +918,11 @@ function renderAdmin(){
         <div><input id="closeIn" type="time" value="${betsCloseAt().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Australia/Melbourne'})}"></div>
         <button class="btn sm" id="closeSave">Save</button></div>
       <div class="hint">Mysteries are spun in the 🎡 Wheel tab.</div></div>
+    <div class="card"><b>👤 Fix a player's picks</b>
+      <div class="hint">After the close only admins can change picks, e.g. after a late scratching. Open a player's My Bets as them, then tap "Back" at the top.</div>
+      <div class="grid" style="grid-template-columns:1fr auto;align-items:end;margin-top:8px">
+        <div><select id="actSel"><option value="">Choose a player…</option>${(S.data.players||[]).slice().sort((a,b)=>a.sort_order-b.sort_order).map(p=>`<option value="${p.id}">${esc(p.display_name)}</option>`).join('')}</select></div>
+        <button class="btn sm" id="actGo">Open</button></div></div>
     <div class="card"><b>🧾 Bet slip: put these on Sportsbet</b>
       <div class="hint">Every pick, race by race. Put it on, type the odds you got, tap ✓. Players see the odds on their bet. Team bets are in <i>Group bets</i> below.</div>
       <div id="slipBox"></div></div>
@@ -906,6 +954,7 @@ function renderAdmin(){
     if(error){ alert(error.message); return; } await loadAll(); render();
   };
   renderSlip(v.querySelector('#slipBox'));
+  v.querySelector('#actGo').onclick=()=>{ const id=Number(v.querySelector('#actSel').value); if(id) actAs(id); };
   const gbBox=v.querySelector('#gbBox');
   (S.data.group_bets||[]).slice().sort((a,b)=>a.id-b.id).forEach(g=>gbBox.appendChild(groupBetEditor(g)));
   const qrBox=v.querySelector('#qrBox'); const qr=quaddieReturns();
@@ -929,26 +978,30 @@ function renderSlip(box){
   const P=id=>(S.data.players||[]).find(p=>p.id===id);
   const TYPE={group_pick:'👥 group',pick_of_day:'🎯 POD',individual:'bet'};
   const races=(S.data.races||[]).slice().sort((a,b)=>a.sort_order-b.sort_order);
+  const live=b=>!isScratched(b.race_id,b.runner_number);
   const all=S.data.bets||[];
-  const on=all.filter(b=>Number(b.odds)>1).length;
-  box.appendChild(el(`<div class="small" style="margin:6px 0"><b>${on}</b> of <b>${all.length}</b> picks have odds (are on).</div>`));
+  const on=all.filter(b=>live(b)&&Number(b.odds)>1).length, need=all.filter(live).length;
+  box.appendChild(el(`<div class="small" style="margin:6px 0"><b>${on}</b> of <b>${need}</b> picks have odds (are on).${all.length>need?` ${all.length-need} on scratched horses (they refund, so don't put them on).`:''}</div>`));
   races.forEach(r=>{
     const bets=all.filter(b=>b.race_id===r.id).sort((a,b)=>a.runner_number-b.runner_number||a.player_id-b.player_id);
     if(!bets.length) return;
-    const n=bets.filter(b=>Number(b.odds)>1).length;
-    const det=el(`<details class="fdet" ${S.openSlip&&S.openSlip.has(r.id)?'open':''}><summary class="small" style="margin-top:6px"><b>R${r.race_no} ${esc(r.track.slice(0,4))} · ${esc(r.name)}</b> · ${melbTime(r.jump_time)} · ${n}/${bets.length} on${n===bets.length?' ✅':''}</summary><div></div></details>`);
+    const n=bets.filter(b=>live(b)&&Number(b.odds)>1).length, m=bets.filter(live).length;
+    const det=el(`<details class="fdet" ${S.openSlip&&S.openSlip.has(r.id)?'open':''}><summary class="small" style="margin-top:6px"><b>R${r.race_no} ${esc(r.track.slice(0,4))} · ${esc(r.name)}</b> · ${melbTime(r.jump_time)} · ${n}/${m} on${n===m?' ✅':''}</summary><div></div></details>`);
     det.ontoggle=e=>{ S.openSlip=S.openSlip||new Set(); e.target.open?S.openSlip.add(r.id):S.openSlip.delete(r.id); };
     const body=det.querySelector('div');
     bets.forEach(b=>{
       const p=P(b.player_id)||{};
+      if(!live(b)){ body.appendChild(el(`<div class="slip" style="grid-template-columns:1fr"><div><b>#${b.runner_number}</b> ${esc(b.horse_name||'')} <span class="pill rose">SCR</span><div class="mut">${esc(p.display_name||'?')} · ${TYPE[b.bet_type]||b.bet_type} · $${b.stake} · scratched, refunds, don't put on</div></div></div>`)); return; }
       const row=el(`<div class="slip"><div><b>#${b.runner_number}</b> ${esc(b.horse_name||'')}<div class="mut">${esc(p.display_name||'?')} · ${TYPE[b.bet_type]||b.bet_type} · $${b.stake}</div></div>
         <input type="number" step="0.01" inputmode="decimal" placeholder="odds" value="${b.odds||''}"><button class="btn sm">${Number(b.odds)>1?'✓':'Save'}</button></div>`);
       row.querySelector('button').onclick=async()=>{
         const od=Number(row.querySelector('input').value); if(!(od>1)){ alert('Enter the odds you got (e.g. 4.50)'); return; }
-        const {error}=await sb.from('bets').update({odds:od}).eq('id',b.id);
+        // only if the pick is still the horse this row shows; if they've changed it, the odds would land on the wrong horse
+        const {data,error}=await sb.from('bets').update({odds:od}).eq('id',b.id).eq('runner_number',b.runner_number).select();
         if(error){ alert(error.message); return; }
+        if(!data || !data.length){ alert(`${p.display_name||'This player'} has changed this pick since the slip loaded. Check the new horse before putting it on.`); await loadAll(); render(); return; }
+        b.odds=od; const btn=row.querySelector('button'); btn.textContent='✓';   // no full redraw: keeps odds typed in other rows
         if(r.status==='resulted') alert(`R${r.race_no} is already settled. Tap Re-settle on it to apply these odds.`);
-        await loadAll(); render();
       };
       body.appendChild(row);
     });
@@ -972,6 +1025,7 @@ function adminRace(r){
       <div><label>Winner #</label><input class="win" type="number" inputmode="numeric" value="${r.result_win||''}"></div>
       <div><label>Placed #s (2nd,3rd)</label><input class="plc" placeholder="e.g. 5,2" value="${(r.result_places||[]).join(',')}"></div>
       <button class="btn sm settle">${resulted?'Re-settle':'Settle'}</button></div>
+    ${resulted?'<button class="ibtn unsettle" style="margin-top:6px">↩︎ Un-settle (wrong race / mistake)</button>':''}
     <div class="hint">Enter result → settles all bets on this race. Bets on scratched runners are refunded (0 pts).</div>
     <details class="fdet" ${S.openFields.has(r.id)?'open':''}><summary class="small" style="margin-top:6px">Field (${runners.length} runners${nScr?`, ${nScr} scratched`:''}) · load / scratch</summary>
       <div class="scr row" style="flex-wrap:wrap;gap:6px;margin:8px 0"></div>
@@ -980,6 +1034,7 @@ function adminRace(r){
       <button class="btn sm sec loadf" style="margin-top:6px">Load / update field</button>
     </details></div>`);
   card.querySelector('.settle').onclick=()=>settleRace(r,card.querySelector('.win').value,card.querySelector('.plc').value);
+  const us=card.querySelector('.unsettle'); if(us) us.onclick=()=>unsettleRace(r);
   card.querySelector('.fdet').ontoggle=e=>{ e.target.open?S.openFields.add(r.id):S.openFields.delete(r.id); };
   const scr=card.querySelector('.scr');
   runners.forEach(x=>{
@@ -1068,6 +1123,7 @@ function groupBetEditor(g){
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 async function drawPod(){
   await loadAll(); // the admin phone may have slept and missed live updates
+  if(!dataOk()) return;
   // 8 nominated races, assign each of 8 boys to one race, each of 8 girls to one race (random)
   if((S.data.pod_assignments||[]).length && !confirm('Already drawn. Re-draw the group-pick races? Everyone gets a new race, and group picks already placed stay on the old race.')) return;
   const noms=(S.data.races||[]).filter(r=>r.pod_nominated).sort((a,b)=>a.sort_order-b.sort_order);
@@ -1081,6 +1137,7 @@ async function drawPod(){
 }
 async function drawQuaddieSplits(){
   await loadAll(); // the admin phone may have slept and missed live updates
+  if(!dataOk()) return;
   if((S.data.quaddie_groups||[]).length && !confirm('Already drawn. Re-draw the Flem quaddie splits? Picks already entered stay on their old legs.')) return;
   const rows=[];
   for(const q of (S.data.quaddies||[]).filter(q=>q.style==='split')){
@@ -1092,6 +1149,7 @@ async function drawQuaddieSplits(){
 }
 async function lockFeature(){
   await loadAll(); // the admin phone may have slept and missed live updates
+  if(!dataOk()) return;
   for(const g of ['M','F']){
     const votes=(S.data.feature_votes||[]).filter(v=>v.gender===g && !isScratched(108,v.runner_number)); // scratched horses can't run
     if(!votes.length) continue;
@@ -1120,9 +1178,19 @@ async function spinMystery(m){
 // same angle, so the whole squad watches it land together. The result is still saved to group_bets,
 // so anyone who missed it sees it in Games → Mysteries.
 const WHEEL_EVENT='w';
+// The phone driving a spin ignores everyone else's wheel messages until it's finished, and every message carries
+// the spin's id (sid) so watchers follow one spin at a time and a second spinner can't hijack it.
+const WD={active:false,sid:null,cancel:null};
+async function drive(fn){
+  if(WD.active) return;
+  WD.active=true; WD.sid=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  document.querySelectorAll('.wheelwrap').forEach(x=>x.remove());   // stop watching anyone else's spin
+  try{ await fn(); }catch(e){ if(!(e&&e.message==='closed')) alert(e&&e.message||e); }
+  finally{ WD.active=false; WD.cancel=null; }
+}
 let wheelCh=null;
 function wheelBus(){ return window.__wheelBus || { send:p=>wheelCh&&wheelCh.send({type:'broadcast',event:WHEEL_EVENT,payload:p}).catch(()=>{}) }; }
-function wheelSend(p){ try{ wheelBus().send(p); }catch(e){} }
+function wheelSend(p){ try{ wheelBus().send({...p,sid:WD.sid}); }catch(e){} }
 function wheelOverlay(label,sub){
   document.querySelectorAll('.wheelwrap').forEach(x=>x.remove());
   const ov=el(`<div class="wheelwrap">
@@ -1167,7 +1235,8 @@ function spinTo(wheel,T){
   });
 }
 function waitSpinTap(ctrl){
-  return new Promise(res=>{
+  return new Promise((res,rej)=>{
+    WD.cancel=()=>rej(new Error('closed'));   // Close before tapping SPIN ends the drive cleanly
     ctrl.innerHTML='';
     const b=el(`<button class="btn" style="font-size:18px;padding:14px 30px">🎡 SPIN</button>`);
     b.onclick=()=>{ b.disabled=true; res(); };
@@ -1180,9 +1249,11 @@ function revealHtml(p){
 }
 
 // Admin: drive the spin
-async function openMysteryWheel(m){
+async function openMysteryWheel(m){ return drive(()=>driveMystery(m)); }
+async function driveMystery(m){
   if(m.race_id && !confirm(`Re-spin ${m.label}? It's already on R${raceById(m.race_id)?.race_no} #${m.runner_number}.`)) return;
   await loadAll();
+  if(!dataOk()) return;
   // same rule as spinMystery: only races still open for betting that have a field loaded
   const live=r=>(S.data.runners||[]).filter(x=>x.race_id===r.id&&!x.scratched);
   const races=(S.data.races||[]).filter(r=>r.track===m.track && !isLocked(r) && live(r).length).sort((a,b)=>a.sort_order-b.sort_order);
@@ -1190,7 +1261,7 @@ async function openMysteryWheel(m){
   const by=(myPlayer()||{}).display_name||'Admin';
   const W=wheelOverlay(m.label,'📡 Live on every phone');
   let saved=false;
-  W.close.onclick=()=>{ W.ov.remove(); if(!saved) wheelSend({t:'close',label:m.label}); };
+  W.close.onclick=()=>{ W.ov.remove(); if(!saved) wheelSend({t:'close',label:m.label}); if(WD.cancel) WD.cancel(); };
   // spin 1 — the race
   const raceLabels=races.map(r=>'R'+r.race_no);
   const t1='Spin 1 — the RACE';
@@ -1231,27 +1302,31 @@ async function openMysteryWheel(m){
 }
 
 // Everyone else: watch the admin's spin
-const WV={W:null,wheel:null,anim:Promise.resolve(),dismissed:null};
+const WV={W:null,wheel:null,anim:Promise.resolve(),sid:null,done:true,dismissed:null};
 function onWheelMsg(p){
   if(!p || !S.me) return;
+  if(WD.active) return;                          // I'm driving my own spin: ignore everyone else's
   const open=()=>WV.W && document.body.contains(WV.W.ov);
   if(p.t==='open'){
-    if(p.stage===1) WV.dismissed=null;
-    if(WV.dismissed===p.label) return;          // they closed it — don't keep popping it back up
+    if(open() && WV.sid && p.sid!==WV.sid && !WV.done) return;   // already watching someone else's spin
+    if(p.sid!==WV.sid){ WV.sid=p.sid; WV.done=false; }
+    if(WV.dismissed && WV.dismissed===p.sid) return;             // they closed this spin — don't pop it back up
     if(!open()){
       WV.W=wheelOverlay(p.label,`📡 ${p.by} is spinning live`);
-      WV.W.close.onclick=()=>{ WV.dismissed=WV.W.ov.dataset.label; WV.W.ov.remove(); };
+      const sid=p.sid; WV.W.close.onclick=()=>{ WV.dismissed=sid; WV.done=true; WV.W.ov.remove(); };
     }
-    WV.W.ov.dataset.label=p.label;
     WV.W.wt.textContent=p.title;
     if(p.landed) WV.W.sub.textContent='Race: '+p.landed;
     WV.wheel=buildWheel(WV.W.stage,p.labels);
     WV.W.ctrl.innerHTML=`<div class="mut small">Waiting for ${esc(p.by)} to spin…</div>`;
+  } else if(p.sid!==WV.sid){
+    return;                                       // a message from a spin I'm not watching
   } else if(p.t==='spin'){
     if(!open()||!WV.wheel) return;
     WV.W.ctrl.innerHTML='<div class="count">Spinning…</div>';
     WV.anim=spinTo(WV.wheel,p.T);
   } else if(p.t==='reveal'){
+    WV.done=true;
     if(!open()) return;
     const W=WV.W;
     WV.anim.then(()=>{
@@ -1262,12 +1337,24 @@ function onWheelMsg(p){
       const d=el(`<button class="btn">Done 🥩</button>`); d.onclick=()=>W.ov.remove(); W.ctrl.appendChild(d);
     });
   } else if(p.t==='close'){
-    if(open()){ WV.W.wt.textContent='Spin cancelled'; WV.W.ctrl.innerHTML=''; setTimeout(()=>{ if(open()) WV.W.ov.remove(); },1500); }
+    WV.done=true;
+    if(open()){ const W=WV.W; W.wt.textContent='Spin cancelled'; W.ctrl.innerHTML=''; setTimeout(()=>{ if(document.body.contains(W.ov)) W.ov.remove(); },1500); }
   }
+}
+async function unsettleRace(r){
+  if(!confirm(`Un-settle R${r.race_no} ${r.name}? The result is cleared and every bet on it goes back to open (0 pts).`)) return;
+  await loadAll(); if(!dataOk()) return;
+  const errs=[];
+  const a=await sb.from('races').update({status:'upcoming',result_win:null,result_places:[],resulted_at:null}).eq('id',r.id); if(a.error) errs.push(a.error.message);
+  const b=await sb.from('bets').update({status:'open',points:0,payout:0}).eq('race_id',r.id); if(b.error) errs.push(b.error.message);
+  const c=await sb.from('group_bets').update({status:'open',points:0}).eq('race_id',r.id); if(c.error) errs.push(c.error.message);
+  if(errs.length) alert('Un-settle had problems: '+errs.join('; ')); else msg(`R${r.race_no} un-settled ✓`);
+  await loadAll(); render();
 }
 async function settleRace(r,winStr,plcStr){
   const win=Number(winStr); if(!win){alert('Enter winner #');return;}
   await loadAll(); // settle every bet in the DB, including ones this phone never received live
+  if(!dataOk()) return;
   const places=(plcStr||'').split(',').map(s=>Number(s.trim())).filter(Boolean);
   const {error:re}=await sb.from('races').update({status:'resulted',result_win:win,result_places:places,resulted_at:new Date().toISOString()}).eq('id',r.id);
   if(re){ alert('Could not save result: '+re.message); return; }
